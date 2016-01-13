@@ -1,0 +1,157 @@
+这篇文章翻译自：https://www.compose.io/articles/what-postgresql-has-over-other-open-source-sql-databases/
+
+PostgreSQL宣称：“这是世界上最高级的开源数据库。”这篇文章将PostgreSQL与MySQL、MariaDB和Firebird对比，得到PostgreSQL的一些特点。
+
+第一部分主要是存储数据-模型，结构，类型和大小限制。在第二部分重点放在数据处理和检索。
+
+数据模型
+
+PostgreSQL不只是关系型的，它是对象关系型。这使得它拥有超越其他开源数据库的一些优点，比如MySQL，MariaDB和Firebird。
+
+对象关系数据库的一个基本特征是支持用户定义的对象及其行为，包括数据类型、函数、运算符、域和索引。这使得PostgreSQL非常灵活和强大。在其他方面，可以创建、存储和检索复杂的数据结构。在下面的一些例子中你会看到嵌套的复合结构，而标准关系型数据库是不支持的。
+
+数据类型和结构
+
+还有，PostgreSQL支持数据类型非常广泛。除了你可能期望的数字、字符串、布尔值和浮点数据类型（以及在这些选项之中的），PostgreSQL还支持UUID、货币、枚举、地理、二进制、网络地址、位字符串，文本搜索，XML，JSON，数组，复合范围类型，以及对象识别和日志定位的一些内部类型。坦白说，MySQL、MariaDB和Firebird各自都不同程度的支持这些类型，但只有PostgreSQL支持他们所有。
+
+让我们仔细看几个例子：
+
+网络地址
+
+PostgreSQL提供了用于存储不同网络地址的类型。CIDR（无分类互联网域间路由）的数据类型遵循IPv4和IPv6网络地址的惯例。CIDR的一些例子：
+
+192.168.100.128/25
+10.1.2.3/32
+2001:4f8:3:ba:2e0:81ff:fe22:d1f1/128
+::ffff:1.2.3.0/128
+也可存储网络地址的是INET数据类型，用于所在子网可选的IPv4和IPv6主机地址。数据类型MACADDR可以用来存储用于硬件识别的MAC地址，比如08-00-2b-01-02-03 。
+
+MySQL和MariaDB有INET函数转换网络地址，但不提供本地存储网络地址的数据类型。Firebird也没有网络地址类型。
+
+多维数组
+
+因为PostgreSQL是一个对象关系型数据库，数组的值可以保存为大部分的现有数据类型。可以通过在列的数据类型定义上加方括号或者使用ARRAY表达式做到。可以指定数组大小，但不是必需的。让我们看一看节日野餐菜单的例子，用以演示数组的使用：
+
+-- create a table where the values are arrays
+CREATETABLE holiday_picnic (  
+     holiday varchar(50) -- single value
+     sandwich text[], -- array
+     side text[] [], -- multi-dimensional array
+     dessert text ARRAY, -- array
+     beverage text ARRAY[4] -- array of 4 items
+);
+
+ -- insert array values into the table
+INSERTINTO holiday_picnic VALUES  
+     ('Labor Day',
+     '{"roast beef","veggie","turkey"}',
+     '{
+        {"potato salad","green salad","macaroni salad"},
+        {"chips","crackers"}
+     }',
+     '{"fruit cocktail","berry pie","ice cream"}',
+     '{"soda","juice","beer","water"}'
+     );
+MySQL，MariaDB和Firebird都没有这个能力。想在传统的关系数据库中以数组的形式存储这些值，一个解决方案是创建一个单独的表，数组中的每个值作为表的一行。
+
+地理数据
+
+支持地理数据迅速成为许多应用的核心要求。PostgreSQL一直支持各种地理数据类型，如点、线、圆以及多边形。PATH数据类型就是其中之一。一个路径由多个顺序点组成，可以是开口的（开始和结束点不连接）或是闭合的（开始和结束点连接）。让我们用一个徒步旅行的例子作为一个路径。在这种情况下，我的远足路径是一个环形，所以我的起点和终点是相连的，并且因此我的路径是闭合的。在坐标系下，圆括号表示一个闭合的路径，而方括号表示一个开口的路径。
+
+-- create a table for trails
+CREATETABLE trails (  
+     trail_name varchar(250),
+     trail_path path
+);
+
+ -- insert a trail into the table
+-- where the path is defined by lat-long coordinates
+INSERTINTO trails VALUES  
+     ('Dool Trail - Creeping Forest Trail Loop',
+     ((37.172,-122.22261666667),
+     (37.171616666667,-122.22385),
+     (37.1735,-122.2236),
+     (37.175416666667,-122.223),
+     (37.1758,-122.22378333333),
+     (37.179466666667,-122.22866666667),
+     (37.18395,-122.22675),
+     (37.180783333333,-122.22466666667),
+     (37.176116666667,-122.2222),
+     (37.1753,-122.22293333333),
+     (37.173116666667,-122.22281666667)));
+The PostGIS extension available for PostgreSQL augments the existing geometric data featues with additional spatial types, functions, operators and indexes. It's location aware and supports both raster and vector data. It also provides for interoperability with a variety of 3rd party open source and proprietary geo-spatial tools for working with, mapping and rendering the data. We rolled PostGIS out for Compose PostgreSQL deployments in January this year: PostGIS for All Compose PostgreSQL Deployments.
+
+PostgreSQL 的POSTGIS扩展补充了现有地理数据的特征，它提供了额外的空间数据类型、函数、运算符和索引。它能感知位置并支持栅格和矢量数据。它还提供了各种第三方开放源代码和处理、映射和渲染数据用的专有地理空间工具的互操作性。今年一月我们推出了PostGIS作为PostgreSQL部署组件：PostGIS for All Compose PostgreSQL Deployments.
+
+注意，在MySQL 5.7.8和MariaDB 5.3.3 以后的版本中，增加了扩展数据类型，以支持地理信息的OpenGIS标准。该版本的MySQL和MariaDB之后的版本中，都提供了类似的数据类型，用以存储PostgreSQL即时可用的地理数据类型。然而，在MySQL和MariaDB中，数据插入表格之前，必须首先使用简单的命令将数据值转换成地理数据形式。Firebird目前不提供地理数据类型。
+
+JSON支持
+
+PostgreSQL的JSON让你能在一个SQL数据库使用无模式。当数据结构需要一些灵活性时这个比较有用，因为数据结构可能在开发中发生变化，或当它不知道数据对象会包含哪些数据字段时。
+
+JSON数据类型强制执行有效的JSON，这样就可以利用PostgreSQL内建的专用JSON操作符和函数查询和处理数据。还有一个JSONB类型——JSON去除空格后的二进制形式，不保存对象顺序但却是最佳存储，而且只保留重复键值的最后一个。JSONB通常是首选的格式，因为该格式下，每个对象所需空间更少，支持索引，不需要重新解析所以处理更快速。 了解更多，请参看: PostgreSQL是你的下一个JSON数据库吗?
+
+在MySQL 5.7.8和MariaDB10.0.1中，添加了对原生JSON对象支持。尽管这些数据库中有各种各样的函数和操作符用于JSON类型，但它们都不是PostgreSQL中JSONB的索引方式。Firebird还没加入这个队伍，并且还只支持文本式的JSON对象。
+
+创建一个新类型
+
+而且，即使PostgreSQL有广泛的现有数据类型列表，但好像还是不够，你可以使用CREATE TYPE命令创建新的数据类型作为复合，列举，范围和基类型。这里是创建和查询一个新的复合类型的例子：
+
+-- create a new composite type called "wine"
+CREATETYPE wine AS (  
+     wine_vineyard varchar(50),
+     wine_type varchar(50),
+     wine_year int
+);
+
+ -- create a table that uses the composite type "wine"
+CREATETABLE pairings (  
+     menu_entree varchar(50),
+     wine_pairing wine
+);
+
+ -- insert data into the table using the ROW expression
+INSERTINTO pairings VALUES  
+     ('Lobster Tail',ROW('Stag''s Leap','Chardonnay', 2012)),
+     ('Elk Medallions',ROW('Rombauer','Cabernet Sauvignon',2012));
+
+ /*
+   query from the table using the table column name
+   (use parentheses followed by a period
+   then the name of the field from the composite type)
+ */SELECT (wine_pairing).wine_vineyard, (wine_pairing).wine_type  
+FROM pairings  
+WHERE menu_entree ='Elk Medallions';  
+由于他们不是对象关系型的，MySQL、MariaDB和Firebird都不提供这个强大的功能。
+
+数据规模
+
+PostgreSQL可以处理大量数据。目前发布的规模限制如下：
+
+Limit	Value
+Maximum Database Size	Unlimited
+Maximum Table Size	32 TB
+Maximum Row Size	1.6 TB
+Maximum Field Size	1 GB
+Maximum Rows per Table	Unlimited
+Maximum Columns per Table	250 - 1600 depending on column types
+Maximum Indexes per Table	Unlimited
+At Compose we auto-scale your deployment so you don't have to worry when your data grows. But, as every DBA knows, it's good to be wary about extremely large and unlimited capacities. We recommend you let common sense be your guide when creating your tables and performing indexing.
+
+在Compose我们自动扩大您的部署规模，所以你不必担心数据增长时候的情况。但是，正如每个DBA都知道的，当数据规模非常大，需要无限容量时谨慎总是好的。我们建议您在创建表和执行索引时，还是判断一下。
+
+相比而言，MySQL和MariaDB都因65535字节的行大小限制而臭名昭著。Firebird也只声称了64KB的行最大值。通常，数据规模是由操作系统文件规模限制的。因为PostgreSQL可以将表存储在多个较小的文件中，所以它可以绕过这个限制——不过，需要重点注意的是，文件过多可能会对性能产生负面影响。然而，对比PostgreSQL，MySQL和MariaDB确实能在每个表中支持更多的列数（根据数据类型不同最多可达4096），单个表的规模也更大，但在非常情况下，需要跨越现有的PostgreSQL限制。
+
+数据完整性
+
+PostgreSQL是力求符合ANSI-SQL：2008标准，一个完全的ACID（原子性，一致性，隔离性和持久性）的标准，并以其坚实的引用和事务完整性的知名。主键，限制以及级联外键，唯一约束，非空约束，条件约束和其他数据完整性特征，确保只有验证过的数据才能存储。
+
+MySQL和MariaDB为了成为符合InnoDB / XtraDB存储引擎的SQL标准做的更多。他们现在提供了一个STRICT选项来使用SQL模式，这决定了数据验证检查的习惯；然而，在更新数据时无效或是已被截断的数据能否插入或创建取决于你使用的模式。这两个数据库都不支持条件约束，而且对于外键约束也有一系列的警告。此外，数据完整性可能会明显取决于存储引擎选择。MySQL（和MariaDB分支）长期在完整性和规范性上 进行速度和效率上反复权衡已经不是秘密了。
+
+总结
+
+PostgreSQL有很多功能。由于使用对象关系模型构建，它支持复杂结构和广泛内建以及用户自定义的数据类型。它提供了广泛的数据容量，并保证数据的完整性。对于存储数据，您可能不需要这里列举的所有高级功能，但由于数据需求会快速发展，掌握它毫无疑问是极有好处的。
+
+如果感觉PostgreSQL不符合你的需求比例或者你更喜欢不按规则来，那就看看 我们在Compose提供的NoSQL数据库 或者是考虑我们所提到的其他开源数据库吧。他们每个都有各自的优势。Compose坚决支持为任务选择最合适的数据库…而且有时候，这意味着一个多数据库的解决方案！
+
+准备好更多地了解PostgreSQL了吗？在本系列的第二部分，我们将看看PostgreSQL的数据处理和检索功能，包括虚表特性，查询功能，索引以及语言扩展。
