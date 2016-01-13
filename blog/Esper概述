@@ -1,0 +1,215 @@
+Esper概述
+ 
+关系型数据库不适合每秒成百上千的数据量的查询，Esper引擎允许应用存储查询并运行数据通过，来代替存储数据并执行查询存储数据的工作方式。
+Esper的事件模式匹配和事件流查询虽然是应对不同需求的，但是都是通过相同的API来实现的。
+事件驱动应用服务器是为每秒需要处理超过100，000个事件的服务器提供一个运行时和多种支撑基础设施服务（如传输、安全、事件日志、高可靠性和连接、持久化等）。事件驱动服务器除了能实现事件处理，还要能将事件信息和长时间存在的数据（历史数据）结合起来，能在事件流上执行临时的关联关系和匹配操作。
+在事件系统中要区分两个概念：
+事件流处理（ESP，Event Stream Processing）：检测事件数据流，分析出那些符合条件的事件，然后通知监听器
+复杂事件处理（CEP，Complex Event Processing）：监察各事件间的模式
+Esper结构
+Esper的事件驱动架构图：
+
+整个EDA（Event　Driven　Architecture）包括：
+data Streams:事件源，提供高速、海量的实时数据。
+Event Stream adapters:事件源的接入适配器，用于接收事件源数据，并且转发事件给Esper引擎。
+Esper Engine：Esper引擎部分。其负责注册statement以及statement的监听、事件类型等信息，执行事件处理。
+output adapters:输出适配器，通过监听等获取引擎处理的有价值信息，通过该适配器输出。即与引擎外包程序连接的入口。
+Event Query & Causality Pattern Language：事件处理语言，包括规则引擎（事件查询语言）以及状态引擎（模式匹配）的定义。Esper引擎执行事件处理时，依赖这些引擎的定义。
+Core Container:核心容器。特殊算法、操作分析等。
+HistorycalData access layer:历史数据访问层。在引擎处理时，会将Esper引擎处理views的历史数据（比如时间窗口 取过去30s的平均值）时，保存历史数据，供引擎处理。
+整个Esper架构——轻量级的ESP（Event Stream processing事件流处理）和CEP（Complex Event Processing复合事件处理）容器，由以上各个部分组成。
+
+运行时，event stream的流转如箭头方向所指。
+或者如下图：
+
+ 
+上图中，通过事件处理总线，即接入adapter以及引擎注册，负责接收事件并交由引擎处理；引擎处理的过程需要借助Esper的内部缓存以及状态引擎、规则引擎等对事件进行解析、筛选处理。引擎处理输出的事件信息、历史数据等都会在内部缓存中进行保存。最后事件消费方获取有价值数据，执行相应动作。
+ 
+ 
+Esper从内容上分为两块，esper的核心esper-4.x.x.jar和esper-io。
+（1）esper的核心包包含了EPL语法解析引擎，事件监听机制，事件处理等核心模块。
+（2）esper的io包含从各种数据源读取数据以及将输出结果写入各种数据源，包括excel，database，JMS,http,socket, XML.
+
+ 
+1、Event对象：Esper处理的事件的最小单位，一个任意的javabean对象，属性支持简单的java类型，数组，map、以及嵌套javabean。样例代码不细述，资源很多。
+2、EPL：EPL是Esper的核心，它类似于SQL，但是和SQL的执行方式不同。SQL是数据不动，每执行SQL就会触发查询；而EPL是查询不动，数据输入达到一定条件即可触发查询。
+这个触发的条件可有多种：
+a)每个event对象来就触发一次查询，并只处理当前对象 
+
+select * from orderEvent
+这个EPL语句会在每个orderEvent对象到达后，并将该event交给后续的监听器处理。
+b)窗口处理模式：有两种窗口，时间窗口和长度窗口。
+时间窗口：假设在一个场景中，要获取最近3秒内orderEvent的price的平均值，若采用一般做法，做个后台线程进行3秒的时间统计，时间到了就进行后续处理。而在EPL中：
+
+select avg(price) from test.orderEvent.win:time(3 sec)
+win:time(3 sec)就是定义了3秒的时间窗口，avg(price)就是统计了3秒内的orderEvent对象的price属性的平均值。
+长度窗口：
+
+select avg(price) from test.orderEvent.win:length(10)
+win:length(10)就是定义了10个Event的长度窗口，avg(price)就是统计了最近10个orderEvent对象的price属性的平均值。
+上面是用法，下面来看看内部实现方式。
+ 
+
+ 
+
+它仅保留最近时间窗口的对象内容，但是每个Event到来都会触发一次UpdateListener的操作。
+EPL语句会作为一个statement来监听事件的到来，当new Events有新事件时就会触发updatelistener的操作，
+public class MyListener implements UpdateListener{
+    publicvoid update(EventBean[] newEvents,EventBean[] oldEvents){
+        EventBeanevent= newEvents[0];
+        System.out.println("avg="+event.get("avg(price)"));
+    }
+}
+event.get("avg(price)")就可以获得EPL查询所获得的price平均值，然后就可以加入自己的代码处理，new Events和old Events是输入，avg(price)操作所计算的对象就是Length Window中的内容。
+事件窗口也是类似。
+EPL的时间窗口的计时源码：
+ScheduledThreadPoolExecutor timer;//省略构造
+timerTask = new EPLTimerTask(timerCallback);
+ScheduledFuture<?> future = timer.scheduleAtFixedRate(timerTask, 0, msecTimerResolution, TimeUnit.MILLISECONDS);//估计每100毫秒运行一次
+... 
+_lastDrift = Math.abs(future.getDelay(TimeUnit.MILLISECONDS));//计算延迟
+...
+CurrentTimeEvent currentTimeEvent = new CurrentTimeEvent(msec);
+sendEvent(currentTimeEvent);//发送时间控制Event
+ 
+ScheduledThreadPoolExecutor.scheduleAtFixedRate固定每100ms（可配置）运行一次，并且通过计算延迟future.getDelay来确保计时精确，接下来通过发送一个CurrentTimeEvent来推送时间前进100+delay（ms）,即Esper中的时间不是完全受机器时间控制的，而是通过发送TimeEvent由应用来进行控制的，这方便了很多的扩展。
+
+c)批量窗口处理模式
+窗口模式是会在每个Event来都触发一次UpdateListener操作，若每秒Event数量达到很大的话这种方式会消耗CPU很多。
+批量窗口处理模式则会避免这个问题。
+批量时间窗口模式：
+
+select avg(price) from test.orderEvent.win:time_batch(3 sec)
+批量长度窗口模式：
+
+select avg(price) from test.orderEvent.win:length_batch(10)
+时间批量模式的操作图如下：
+ 
+
+ 
+
+上图的时间窗口大小为4s，它会在4s的窗口时间到达后才将窗口中的内容一起传给updatelistener处理，性能相对节约很多。
+长度批量窗口的处理模式也是类似。
+上述窗口模式下，它会保存两个窗口的内存使用量，一个是当前窗口的Events，一个是上一个窗口的Events，因此估算一个数据分析程序占用多少内存要看上面监听的EPL语句开的窗口大小以及数据的TPS（系统吞吐量指标），防止内存OOM（out of memory）。
+d）过滤
+where过滤：
+
+select avg(price) from test.orderEvent.win:time_batch(3 sec) where price>10
+having过滤：
+
+select avg(price) from test.orderEvent.win:time_batch(3 sec)having price>10
+这两个语句的执行方式和SQL里的where和having基本类似。SQL里，where在聚合前先筛选记录，having则在聚合后对组记录进行筛选，同时出现，where会在group by和having之前作用。
+EPL里，where是在incoming Events（新到事件）到window（窗口）之间进行过滤，having是在window（窗口）到new Events（新产生事件，即监听后返回的）之间进行过滤。同样，where会在having之前作用。
+e)聚合
+count：
+
+select count(price) from test.orderEvent.win:time_batch(3 sec) where price>10
+sum：
+
+ select sum(price) from test.orderEvent.win:time_batch(3 sec) where price>10
+group by：
+
+select itemName,sum(price) from test.orderEvent.win:time_batch(3 sec) where price>10 group by itemName
+这些按照sql类似的理解就行。
+f）函数
+Esper默认加载java.lang.*; java.math.*; java.text.*;  java.util.*;所以会支持这些包下的函数方法。比如
+select Math.round(sum(price)) from test.orderEvent.win:time_batch(3 sec) where price>10
+它还可以支持自定义的函数，如下例：
+public class Util {
+    public static double computePercent(double amount, double total) {
+        return amount / total * 100;
+    }
+}
+在POJO中配置一下，
+
+<plugin-singlerow-function name="percent"
+function-class="mycompany.MyUtilityClass" function-method="computePercent" />
+然后就可以使用了：
+
+select percent(price,total) from orderEvent
+ 
+Esper使用方法（esper-5.2.0）
+ 
+1、下载第三方库：
+antlr-runtime-4.1.jar
+cglib-nodep-3.1.jar
+commons-logging-1.1.3.jar    log4j-1.2.17.jar
+2、在Eclipse中建立java项目，导入上述库
+3、样例代码：（测试通过）
+package complexEvent;
+import com.espertech.esper.client.*;
+import java.util.Random;
+import java.util.Date;
+
+public class exampleMain {
+	public static class Tick{//基础事件类
+		String symbol;
+		Double price;
+		Date timeStamp;
+		public Tick(String s, double p, long t){
+			symbol = s;
+			price = p;
+			timeStamp = new Date(t);
+		}
+		
+		public String getSymbol() {
+			return symbol;
+		}
+
+		public void setSymbol(String symbol) {
+			this.symbol = symbol;
+		}
+
+		public Double getPrice() {
+			return price;
+		}
+
+		public void setPrice(Double price) {
+			this.price = price;
+		}
+
+		public Date getTimeStamp() {
+			return timeStamp;
+		}
+
+		public void setTimeStamp(Date timeStamp) {
+			this.timeStamp = timeStamp;
+		}
+
+		@Override
+		public String toString(){
+			return "Price:" + price.toString() + " time:" + timeStamp.toString();
+		}
+	}
+	private static Random generator = new Random();
+	public static void GenerateRandomTick(EPRuntime cepRT){<//事件模拟
+		double price = (double)generator.nextInt(10);
+		long timeStamp = System.currentTimeMillis();
+		String symbol = "APPL";
+		Tick tick = new Tick(symbol, price, timeStamp);
+		System.out.println("Sending tick:" + tick);
+		cepRT.sendEvent(tick);
+	}
+	public static class CEPListener implements UpdateListener{//监听器实现
+		@Override
+		public void update(EventBean[] newData, EventBean[] oldData){
+			for (EventBean eb : newData){
+				System.out.println("Event received:" + eb.get("price"));
+			}
+		}
+	}
+	public static void main(String[] args){
+		Configuration cepConfig = new Configuration();
+		cepConfig.addEventType("StockTick", Tick.class);    //事件配置
+		EPServiceProvider cep = EPServiceProviderManager.getDefaultProvider(cepConfig);
+		EPRuntime cepRT = cep.getEPRuntime();//获取Esper运行时
+		
+		EPAdministrator cepAdm = cep.getEPAdministrator();//注册引擎
+		EPStatement cepStatement = cepAdm.createEPL("select symbol,price from StockTick");
+		cepStatement.addListener(new CEPListener());//添加监听器
+		for ( int i = 0; i < 10; i++){
+			GenerateRandomTick(cepRT);
+		}
+	}
+}
+未完待续。。。
