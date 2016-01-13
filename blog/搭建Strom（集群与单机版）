@@ -1,0 +1,111 @@
+storm旧版本中使用zeromq作为网络通信库，安装比较复杂，且仅限于linux平台；新版本中将zeromq替换为纯jvm实现，可以跨平台安装在windows,mac os,linux上，安装过程也更简便。先讲新版安装，旧版稍后讲解（集群与单机版也就zookeeper配置文件略有不同）。
+一、storm集群搭建（以3台机器为例）
+
+1、JAVA安装（自行搜索，不细说）
+
+2、ZOOKEEPER安装
+
+解压安装包：tar -zxvf zookeeper-3.4.7.tar.gz
+将安装包复制到安装目录下：mv zookeeper-3.4.7 /usr/pro/zookeeper
+进入安装目录：cd /usr/pro/zookeeper/conf
+复制zoo-example.cfg为zoo.cfg：cp zoo-example.cfg zoo.cfg
+vi zoo.cfg
+#若为单机版
+TickTime=2000
+dataDir=/usr/pro/zookeeper/data
+clientPort=2181
+#若为集群
+TickTime=2000
+dataDir=/usr/pro/zookeeper/data
+clientPort=2181
+server.1=xx.xx.xx.xx:2181        ##服务器1地址
+server.2=xx.xx.xx.xx:2181        ##服务器2地址
+server.3=xx.xx.xx.xx:2181        ##服务器3地址。。。。若有更多请追加
+synLimit=2  #同步时间
+initLimit=5
+保存退出
+各服务器均按照此过程安装配置
+在zookeeper/data/下新建一个myid，服务器1写入1，服务器2写入2，服务器3写入3
+启动zookeeper：sh /usr/pro/zookeeper/bin/zkServer.sh  restart
+3、STORM安装
+
+解压安装包：tar -zxvf apache-storm-0.10.0.tar.gz
+将安装包复制到安装目录下：mv apache-storm-0.10.0.tar.gz /usr/pro/storm
+配置环境变量：vi /etc/profile
+追加：#storm
+        export     STORM_HOME=/usr/pro/storm
+        export    PATH=$PATH:$STORM_HOME/bin
+更新环境变量：./source
+修改storm.yaml配置：
+       storm.zookeeper.servers:##根据自己的zookeeper服务器地址配置
+               - "192.168.1.1"
+               - "192.168.1.2"
+               - "192.168.1.6"
+       nimbus.host: "192.168.1.1"  ##配置nimbus地址（此为主机，其他机器作为supervisor）
+      #supervisor端口
+       supervisor.slots.ports:
+                    - 6700
+                    - 6701
+                    - 6702
+                    - 6703
+       #local dir
+        storm.local.dir: "/usr/pro/storm/workdir"##本地workdir目录，可自行配置
+其他服务器均按此过程安装配置
+启动storm集群：
+ 选择作为nimbus主机的机器上启动nimbus：/usr/pro/storm/bin/storm nimbus &
+ 其他supervisor机器启动supervisor：/usr/pro/storm/bin/storm supervisor &
+ nimbus主机启动storm ui：/usr/pro/storm/bin/storm ui &
+启动过程可能会出现permission denied，是因为storm/bin目录下的storm和storm.py文件权限不够，将权限提升至777即可：sudo chmod 777 storm & chmod 777 storm.py
+
+在各机器上验证：jps 或者访问http://192.168.1.1:8080出现storm UI
+4、运行STORM样例：
+
+在nimbus主机上执行下列命令：storm jar storm-starter-topologies-0.10.0.jar storm.starter.WordCountTopology wordcount
+二、storm旧版单机版安装
+
+ 1、java安装（同上述新版安装）
+2、zookeeper安装（同上述新版安装）
+3、ZeroMQ安装
+安装ZeroMQ 2.1.7：
+
+cd /usr/local/src/
+wget http://download.zeromq.org/zeromq-2.1.7.tar.gz
+tar -xzf zeromq-2.1.7.tar.gz
+cd zeromq-2.1.7
+./configure
+make
+./configure --with-pgm
+
+sudo make install注意：
+
+（1）如果提示找不到uuid，则通过以下命令安装：sudo apt-get installuuid
+
+（2）如果提示没有c++编译器，则通过以下命令安装：sudo apt-get install g++
+
+（3）如果提示没有autotool，则通过以下命令安装：sudo apt-get install autotool
+
+2 安装JZMQ
+下载后编译安装JZMQ：
+
+cd /usr/local/src/
+git clone https://github.com/nathanmarz/jzmq.git
+cd jzmq
+./autogen.sh
+./configure
+make
+sudo make install
+注意：
+（1）如果安装jzmq时遇到No rule to make target `classdist_noinst.stamp’的make错误，则手动创建classdist_noinst.stamp空文件。
+touch src/classdist_noinst.stamp
+
+（2）如果安装jzmq时遇到cannot access org.zeromq.ZMQ的make错误，具体的make错误信息：
+
+error: cannot access org.zeromq.ZMQ
+class file for org.zeromq.ZMQ not found
+javadoc: error - Class org.zeromq.ZMQ not found.
+解决方法：手动编译，然后重新make即可通过。
+
+cd src
+javac -d . org/zeromq/*.java
+cd ..
+4、storm安装（同新版安装）
