@@ -1,0 +1,151 @@
+Esper事件表示方式
+Esper支持在系统启动初始时配置预定义的事件类型，也支持在系统运行的时候通过API或是EPL语法动态的添加事件类型。这些配置会在后面的文章中详述，本文的重点是数据结构定义。
+ 
+2.1    隐藏于java对象之下的事件
+ 
+事件是已发生的一个动作或状态变化的不可变记录。事件的属性记录了事件的状态信息。
+Java Class
+Description
+java.lang.Object
+所有遵循JavaBean惯例而且具有get方法的Java POJO（java普通类）；不遵循javaBean惯例的传统java类也可以作为事件
+java.util.Map
+Map事件实现的java.util.Map接口，其中Map每个项是一个属性值
+Object [] ( array of object)
+对象数组事件是一系列属性值作为数组元素的对象（类型是Object[]）
+org.w3c.dom.node
+XML文档对象模型（DOM）
+org.apache.axiom.om.OMDocument或是 OMElement
+XML流式API（AtAX）,在EsperIO包中提供
+应用程序类
+通过扩展API接口的插件式事件表示
+Esper为表示事件提供了多种选择。并不是一定要创建一个新的java类才能表示事件。
+所有事件表示方式的共同点：
+支持嵌套、索引和映射属性（属性表达式）。而且在嵌套水平上没有限制。
+支持事件类型的元数据。当然也包含嵌套属性的类型元数据。
+允许将事件本身和部分属性图转移给新的事件。可以查询事件的属性或嵌套的属性图。但是Apache Axiom是个例外，它只支持转移事件本身而不支持转移属性。
+java类、Map和对象数组的表示方式都允许有父类型。
+
+
+接口对所有的事件表示方式都是同样对待，也有少数例外，稍后会讲到。
+多种事件表示方式的优势：
+对于已经使用上述可支持的事件表示方式的应用程序，不必转换成java对象可直接处理。
+事件表示方式都是可交换的，当事件类型改变的时候，可以不必改变epl语句。
+事件表示方式都是可互操作的，允许所有的事件表示方式可以在各种相同或不同的epl语句中互操作。
+多种选择可以更好地在性能、易用性、系统进化和扩展事件的复杂度之间权衡。
+ 
+2.2     事件属性
+ 
+事件属性描述了事件的状态信息。事件属性分为简单属性、索引属性、映射属性和嵌套属性。
+下面这个表格概括了不同类型的事件属性和他们各自在表达式中的语法。这些语法让epl语句能深入查询javabean对象图，XML结构和Map事件。
+类型	
+描述
+语法
+例子
+简单属性
+只有一个值的属性
+name	
+sensorId
+索引属性
+索引属性存储一个同类型的对象有序集合，集合中的每个元素都可以通过一个非负整数索引到
+name[index]
+sensor[0]
+映射属性
+映射属性存储一个同类型的关键字集合
+name('key')
+sensor('light')
+嵌套属性
+嵌套属性包括有额外的属性
+name.nestedname
+sensor.value
+联结也是可以的，比如，
+
+person.address('home').street[0]
+把表达式放在括号里跟在映射属性或是索引属性名的后面也可以作为映射属性关键字或是索引属性的索引值。
+ 
+转义字符
+ 
+如果程序中使用了java.util.Map、object[](object数组)或是XML来表示事件，事件属性名可能包含点字符（.）。反斜线可以转义点字符，这样属性名就可以包含点字符（.）了。比如，
+
+select part1\.part2 from MyEvent
+，使用part1.part2从事件类型MyEvent中提取属性值。
+
+有时事件属性名会和EPL语言的关键字重合或是包含空格或其他特殊字符。这时可以使用反撇号`来转义属性名。比如，
+
+select `order`，price as `price.for.goods` from Quote
+，声明的Quote事件有一个属性的名字是order，而order同时还是一个保留的关键字。
+
+当使用映射或是索引属性时，要确保反撇号字符在map关键字或索引的外面。
+select `candidate book`, `children's books`[0], `book select`('isbn')    from MyEventType
+，事件包括含空格(candidate book)，含单引号(children's books)的索引属性（children's books[0]）和含有关键字的映射属性（book select('isbn')）。
+
+ 
+表达式作为关键字或索引值
+ 
+关键字或索引表达式必须放在括号里。使用表达式作为映射属性的关键字要求表达式必须返回一个String类型的值。使用表达式作为索引属性的索引要求表达式必须返回一个int类型的值。
+假设有如下类声明：
+public class MyEventType {
+    String myMapKey;
+    int myIndexValue;
+    int myInnerIndexValue;
+    Map<String, InnerType> innerTypesMap;//mapped property
+    InnerType[] innerTypesArray;//indexed property
+}
+public class InnerType {
+    String name;
+    int[] ids;
+}
+表达式作map关键字或索引的例子：
+
+select innerTypesMap('somekey'),    //returns map value for 'somekey'
+        innerTypesMap(myMapKey),    //returns map value for myMapKey value(an expression)
+        (expression)
+        innerTypesArray[1],                    //return array value at index 1
+        innerTypesArray(myIndexValue)    //return array value at index myIndexValue
+        (an expression)
+        from MyEventType
+点操作符可以用于获取映射或索引属性返回的值对象里的方法。点操作符还可以实现链式函数调用。
+
+点操作符和表达式一样作为map关键字或索引的例子：
+select innerTypesMap('somekey').ids[1],
+        innerTypesMap(myMapKey).getIds(myIndexValue),
+        innerTypesArray[1].ids[2],
+        innerTypesArray(myIndexValue).getIds(myInnerIndexValue)
+        from MyEventType
+但也要注意一些限制：
+
+用于索引属性的方括号语法允许使用表达式并且要求常量索引值
+当使用表达式作为map关键字或索引的映射属性或索引属性使用点操作符的时候，必须遵循链式函数调用的语法
+ 
+2.3 动态事件属性
+ 
+动态属性是在语句编译阶段不需要知道的事件属性。这些属性都是在运行时决定：他们提供鸭子类型（duck typing）的功能。
+ 
+注：程序设计中，鸭子类型（duck typing）是动态类型的一种风格，即，一个对象有效的语义，不是由继承自特定的类或实现特定的接口，而是由当前方法和属性的集合决定。鸭子类型中，关注的不是对象的类型本身，而是它是如何使用的。
+例如，在不使用鸭子类型的语言中，可以编写一个函数，它接受一个类型为鸭子的对象，并调用它的走和叫方法。在使用鸭子类型的语言中，这样的一个函数可以接受一个任意类型的对象，并调用它的走和叫方法。如果这些需要被调用的方法不存在，那么将引发一个运行时错误。任何拥有这样的正确的走和叫方法的对象都可被函数接受的这种行为引出了这种类型。
+鸭子类型通常得益于不测试方法和函数中参数的类型，而是依赖文档、清晰的代码和测试来确保正确使用。
+从静态类型语言转向动态类型语言的用户通常试图添加一些静态的（运行之前的）类型检查，从而影响了鸭子类型的益处和伸缩性，并约束了语言的动态特性（python文档中有一句：鸭子类型应避免使用type()或isinstance()等测试类型是否合法。）
+ 
+动态属性的思想是给定一个基础事件表示，我们不必总是提前知道所有的属性。基础事件可以拥有一些编译语句时不需要知道的，但在运行时我们又需要查询的属性。
+动态属性的语法由属性名和一个问号标记组成。索引、映射、嵌套属性都可以是动态属性：
+类型	语法
+动态简单属性
+name？
+动态索引属性
+name[index]?
+动态映射属性
+name('key')?
+动态嵌套属性
+name?.nestedPropertyName
+动态属性总是返回java.lang.Object类型。如果运行的时候事件处理过程中动态属性还不存在就会返回null。
+例如，考虑一个提供“item”属性的OrderEvent事件。item属性是Object类型，并且拥有一个指向Service或Product实例的引用。
+假设Service和Product类都提供一个名叫“price”的属性。
+select item.price? from OrderEvent
+通过动态属性，查询语句可以表达从二者任一（Service或Product）对象获取price属性。
+再例如，假设类Service包含一个“serviceName”的属性而类Product并不具有。
+未完待续
+ 
+ 
+ 
+ 
+ 
+ 
