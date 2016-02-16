@@ -1,0 +1,44 @@
+
+
+//Time Limit Exceeded
+public class Solution {
+    public List<List<Integer>> threeSum(int[] nums) {
+        List<List<Integer>> res = new ArrayList<List<Integer>>();
+		if(nums.length == 0)return res;
+		Map<Integer, List<Integer>> map = new HashMap<Integer, List<Integer>>();
+		for(int i=0; i<nums.length; i++){
+			for(int j=i+1; j<nums.length; j++){
+				int k = nums[i]+nums[j];
+//				System.out.println("ni="+nums[i]+" nj="+nums[j]+" k="+k);
+				List<Integer> list;
+				if(map.containsKey(k)){
+					list = map.get(k);
+				}else{
+					list = new ArrayList<Integer>();
+				}
+				list.add(i);
+				list.add(j);
+				map.put(k, list);
+			}
+		}
+		for(int i=0; i<nums.length; i++){
+			int k = -nums[i];
+			if(map.containsKey(k)){
+//				System.out.println("k="+k);
+				List<Integer> t = map.get(k);
+				int j=0;
+				while(j<t.size()){
+					if(t.get(j)!=i && t.get(j+1)!=i){
+						Integer[] tmp = {nums[i],nums[t.get(j)],nums[t.get(j+1)]};
+						Arrays.sort(tmp);
+						List<Integer> r = Arrays.asList(tmp);
+//						System.out.println("    r="+r);
+						if(!res.contains(r))res.add(r);
+					}
+					j+=2;
+				}
+			}
+		}
+		return res;
+    }
+}
