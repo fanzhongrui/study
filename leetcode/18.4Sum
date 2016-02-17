@@ -1,0 +1,33 @@
+//18.4Sum
+public class Solution {
+    public List<List<Integer>> fourSum(int[] nums, int target) {
+        List<List<Integer>> res = new ArrayList<List<Integer>>();
+		if(nums==null || nums.length==0)return res;
+		Arrays.sort(nums);
+		for(int i=0; i<nums.length; i++){
+			if(i>0 && nums[i]==nums[i-1])continue;
+			for(int j=i+1; j<nums.length; j++){
+				if(j>i+1 && nums[j]==nums[j-1])continue;
+				int k = target-nums[i]-nums[j];
+				int st=j+1, ed=nums.length-1;
+				while(st<ed){
+					int x = nums[st]+nums[ed];
+					if(x<k)st++;
+					else if(x>k)ed--;
+					else{
+						List<Integer> t = new ArrayList<Integer>();
+						t.add(nums[i]);
+						t.add(nums[j]);
+						t.add(nums[st]);
+						t.add(nums[ed]);
+						res.add(t);
+						st++;ed--;
+						while(st<ed && nums[st]==nums[st-1])st++;
+						while(st<ed && nums[ed]==nums[ed+1])ed--;
+					}
+				}
+			}
+		}
+		return res;
+    }
+}
