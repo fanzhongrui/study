@@ -1,5 +1,36 @@
 
-
+public class Solution {
+    public List<List<Integer>> threeSum(int[] nums) {
+        List<List<Integer>> res = new ArrayList<List<Integer>>();
+		if(nums.length == 0)return res;
+		Arrays.sort(nums);
+		for(int i=0; i<nums.length; i++){
+			if(i>0&&nums[i]==nums[i-1])continue;
+			int k = -nums[i];
+			int st = i+1, ed = nums.length-1;
+			while(st<ed){
+				int x = nums[st]+nums[ed];
+				if(x<k){
+					st++;
+				}else if(x>k){
+					ed--;
+				}else{
+					List<Integer> t = new ArrayList<Integer>();
+					t.add(nums[i]);
+					t.add(nums[st]);
+					t.add(nums[ed]);
+					res.add(t);
+					st++;
+					ed--;
+					while(st<ed && nums[st]==nums[st-1])st++;
+					while(st<ed && nums[ed]==nums[ed+1])ed--;
+				}
+			}
+		}
+		return res;
+    }
+}
+Anothe solution:
 //Time Limit Exceeded
 public class Solution {
     public List<List<Integer>> threeSum(int[] nums) {
