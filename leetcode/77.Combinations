@@ -1,0 +1,22 @@
+//77.Combinations
+public class Solution {
+    
+	public List<List<Integer>> combine(int n, int k){
+		List<List<Integer>> res = new ArrayList<List<Integer>>();
+		List<Integer> t = new ArrayList<Integer>();
+		getCombine(res, t, 1, n, k);
+		return res;
+	}
+	public void getCombine(List<List<Integer>> res, List<Integer> t, int d, int n, int k){
+		if(d == n+1 || t.size()==k){
+			if(t.size()!=k)return;
+			List<Integer> tmp = new ArrayList<Integer>(t);
+			res.add(tmp);
+			return ;
+		}
+		getCombine(res, t, d+1, n, k);
+		t.add(d);
+		getCombine(res, t, d+1, n, k);
+		t.remove(t.size()-1);
+	}
+}
