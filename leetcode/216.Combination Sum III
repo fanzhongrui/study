@@ -1,0 +1,22 @@
+ //216.Combination Sum III
+public class Solution {
+   
+	public List<List<Integer>> combinationSum3(int k, int n){
+		List<List<Integer>> res = new ArrayList<List<Integer>>();
+		List<Integer> t = new ArrayList<Integer>();
+		getSum3(res, t, 1, k, n);
+		return res;
+	}
+	public void getSum3(List<List<Integer>> res, List<Integer> t, int d, int k, int n){
+		if(d == 10 || n<=0 || t.size()==k){
+			if(n!=0 || t.size() != k)return;
+			List<Integer> tmp = new ArrayList<Integer>(t);
+			res.add(tmp);
+			return;
+		}
+		getSum3(res, t, d+1, k, n);
+		t.add(d);
+		getSum3(res, t, d+1, k, n-d);
+		t.remove(t.size()-1);
+	}
+}
