@@ -1,0 +1,58 @@
+java序列化算法透析
+
+Serialization（序列化）是一种将对象以一连串的字节描述的过程；反序列化（deserialization）是一种将这些字节重建成一个对象的过程。
+
+如何序列化一个对象
+一个对象能够序列化的前提是实现Serializable接口，Serializable接口没有方法，更像是个标记。
+有了这个标记的class就能被序列化机制处理，否则抛出异常。
+
+ObjectOutputStream：表示对象输出流，能把Object输出成Byte流。
+它的writeObject（Object obj）方法可以对参数指定的obj对象进行序列化，把得到的字节序列写到一个目标输出流中。
+
+ObjectInputStream：表示对象输入流，从持久的文件中读取Bytes重建对象。
+它的readObject（）方法从输入流中读取字节序列，再把它们反序列化成为一个对象，并将其返回。
+
+java的序列化算法一般会按步骤做如下事情：
+  将对象实例相关的类元数据输出。
+  递归地输出类的超类描述直到不再有超类。
+  类元数据完了以后，开始从最顶层的超类开始输出对象实例的实际数据值。
+  从上至下递归输出实例的数据。
+  
+假定一个Student类，它的对象需要序列化，可以有如下三种方法：
+方法一：若student类仅仅实现了Serializable接口，则可以按照以下方式进行序列化和反序列化
+ObjectOutputStream采用默认的序列化方式，对Student对象的非transient的实例变量进行序列化。
+ObjectInputStream采用默认的反序列化方式，对Student对象的非transient的实例变量进行反序列化。
+
+方法二：若student类仅仅实现了Serializable接口，
+并且还定义了readObject（ObjectInputStream in）和writeObject（ObjectOutputStream out），
+则采用以下方式进行序列化与反序列化。
+ObjectOutputStream调用Student对象的writeObject（ObjectOutputStream out）的方法进行序列化。
+ObjectInputStream会调用Student对象的readObject（ObjectInputStream in）的方法进行反序列化。
+
+方法三：若student类实现了Externalizable接口，
+且Student类必须实现readExternal（ObjectInput in）和writeExternal（ObjectOutput out）方法，
+则按照以下方式进行序列化与反序列化。
+ObjectOutputStream调用Student对象的writeExternal（ObjectOutput out）的方法进行序列化。
+ObjectInputStream调用Student对象的readExternal（ObjectInput in）的方法进行反序列化。
+
+JDK类库中序列化的步骤
+步骤一：创建一个对象输出流，它可以包装一个其他类型的目标输出流，如文件输出流：
+ObjectOutputStream out＝new objectOutputStream(new fileOutputStream("D:\\objectfile.obj"));
+步骤二：通过对象输出流的writeObject（）方法写对象：
+out.writeObject("hello");
+out.writeObject(new Date());
+为了正确读取数据，完成反序列化，必须保证向对象输出流写对象的顺序与从对象输入流中读对象的顺序一致。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
