@@ -69,9 +69,112 @@ sleep／join／yield方法介绍
     join方法：合并某个线程
     yield方法：让出CPU，给其他线程执行的机会
     
+线程的优先级别：
+    java提供一个线程调度器来监控程序中启动后进入就绪状态的所有线程。
+        线程调度器按照线程的优先级决定调度哪个线程来执行。
+    线程的优先级用数字表示，范围从1到10，一个线程的缺省优先级是5.
+        Thread.MIN_PRIORITY = 1;
+        Thread.MAX_PRIORITY = 10;
+        Thread.NORM_PRIORITY = 5
+    使用下述线程方法获得或设置线程对象的优先级
+        int getPriority();
+        void setPriority(int newPriority);
 
+线程同步
+在java语言中，引入了对象互斥锁的概念，保证共享数据操作的完整性。
+每个对象都对应于一个可称为“互斥锁”的标记，这个标记保证在任一时刻，只能有一个线程访问该对象。
+关键字synchronized来与对象的互斥锁联系。
+当某个对象被synchronized修饰时，表明该对象在任一时刻只能由一个线程访问。
+    synchronized的使用方法：
+        synchronized(this){
+            num++;
+            try{
+                Thread.sleep(1);
+            }catch(InterruptedException e){}
+            System.out.println(name+",是第"+num+"个使用timer的线程");
+        }
+    synchronized还可以放在方法声明中，表示整个方法为同步方法，例如：
+        synchronized public void add(String name){...}
+    
+在声明方法时加入synchronized时表示在执行这个方法的过程之中当前对象被锁定
+在代码块前使用synchronized（this）来锁定当前对象，
+这样就不会再出现两个不同的线程同时访问同一个对象资源的问题了，只有当一个线程访问结束后才会轮到下一个线程来访问
 
+线程死锁的问题：
+    最好只锁定一个对象，不要同时锁定两个对象
 
+生产者消费者问题：
+要点：
+    1.共享数据的不一致性／临界资源的保护
+    2.java对象锁的概念
+    3.synchronized关键字／wait（）及notify（）方法
+public class ProducerConsumer{
+    public static void main(String args[]){
+        SyncStack  stack = new SyncStack();
+        Runnable p = new Producer(stack);
+        Runnable c = new Consumer(stack);
+        Thread p1 = new Thread(p);
+        Thread c1 = new Thread(c);
+        p1.start();
+        c1.start();
+    }
+}
+class SyncStack{//支持多线程同步操作的堆栈的实现
+    private int index = 0;
+    private char[] data = new char[6];
+    public synchronized void push(char c){
+        if(index == data.length){
+            try{
+                this.wait();
+            }catch(InterruptedException e){}
+        }
+        this.notify();
+        data[index] = c;
+        index++;
+    }
+    public synchronized char pop(){
+        if(index == 0){
+            try{
+                this.wait();
+            }catch(InterruptedException e){}
+        }
+        this.notify();
+        index--;
+        return data[index];
+    }
+}
+class Producer implements Runnable{
+    SyncStack stack;
+    public Producer(SyncStack s){
+        stack = s;
+    }
+    public void run(){
+        for(int i=0; i<20; i++){
+            char c = (char)(Math.random()*26+'A');
+            stack.push(c);
+            System.out.println("produced:"+c);
+            try{
+                Thread.sleep((int)(Math.random()*1000));
+            }catch(InterruptedException e){}
+        }
+    }
+}
+class Consumer implements Runnable{
+    SyncStack stack;
+    public Consumer(SyncStack s){
+        stack = s;
+    }
+    public void run(){
+        for(int i=0; i<20; i++){
+            char c = stack.pop();
+            System.out.println("消费："+c);
+            try{
+                Thread.sleep((int)(Math.random()*1000));
+            }catch(InterruptedException e){}
+        }
+    }
+}
+    
 
 
 
