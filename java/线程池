@@ -156,6 +156,16 @@ BlockingQueue的选择
 例一：使用直接提交策略，即SynchronousQueue。
         首先SynchronousQueue是无界的，即存储任务的能力是没有限制的，但是由于该Queue本身的特性，在某次添加元素后必须等待其他线程取走后才能继续添加。
         在这里不是核心线程便是新创建的线程。
+        使用以下参数构造ThreadPoolExecutor：
+              new ThreadPoolExecutor(
+                  2, 3, 30, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(),
+                  new RecorderThreadFactory("CookieRecorderPool"),
+                  new ThreadPoolExecutor.CallerRunsPolicy());
+        当核心线程已经有2个正在运行。
+            1.此时，继续来了一个任务（A），根据前面介绍的“如果运行的线程等于或多于corePoolSize，则Executor始终首选将请求加入队列，而不添加新的线程”，所以A被添加到queue中。
+            2.又来了一个任务（B），且核心2个线程还没有忙完，会先尝试加入队列，但是由于使用的是SynchronousQueue，所以一定无法加入进去。
+            3.此时便满足了上面提到的“如果无法将请求加入队列，则创建新的线程，除非创建此线程超出maximumPoolSize，在这种情况下，任务将被拒绝。”所以必然会创建一个线程来运行这个任务。
+            4.如果这三个
 例二：使用无界队列策略，即LinkedBlockingQueue。
 例三：有界队列，使用ArrayBlockingQueue。
 
