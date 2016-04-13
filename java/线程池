@@ -41,12 +41,63 @@ public class MyThread extends Thread{
   }
 }
 public class TestSingleThreadExecutor｛
+  public static void main(String[] arags){
+    //创建一个可重用固定线程数的线程池
+    ExecutorService pool = Executors.newSingleThreadExecutor();
+    //ExecutorService pool = Executors.newCachedThreadPool();
+    Thread t1 = new MyThread();
+    Thread t2 = new MyThread();
+    Thread t3 = new MyThread();
+    Thread t4 = new MyThread();
+    Thread t5 = new MyThread();
+    //将线程放入池中进行执行
+    pool.execute(t1);
+    pool.execute(t2);
+    pool.execute(t3);
+    pool.execute(t4);
+    pool.execute(t5);
+    //关闭线程池
+    pool.shutdown();
+  }
+}
+
+newScheduledThreadPool  
+public class TestScheduledThreadPoolExecutor｛
+  public static void main(String[] args){
+    ScheduledThreadPoolExecutor exec = new ScheduledThreadPoolExecutor(1);
+    exec.scheduleAtFixRate(new Runnable(){//每隔一段时间就触发异常
+        @Override
+        public void run(){
+          System.out.println("===============");
+        }
+    }, 1000, 5000, TimeUnit.MILLISECONDS);
+    exec.scheduleAtFixedRate(new Runnable(){
+        @Override
+        public void run(){
+            System.out.println(System.nanoTime());
+        }
+    }, 1000, 2000, TimeUnit.MILLISECONDS);
+  }
+}
+
+ThreadPoolExecutor详解
+ThreadPoolExecutor的完整构造方法的签名是：ThreadPoolExecutor（int corePoolSize，
+int maximumPoolSize, long keepAliveTime, TimeUnit unit, 
+BlockingQueue<Runnable> workQueue, ThreadFactory threadFactory, 
+RejectedExecutionHandler handler）.
+corePoolSize---池中所保存的线程数，包括空闲线程。
+maximumPoolSize---池中允许的最大线程数。
+keepAliveTime---当线程数大于核心时，此为终止前多余的空闲线程等待新任务的最长时间。
+unit---keepAliveTime参数的时间单位。
+workQueue---执行前用于保持任务的队列。此队列仅保持由execute方法提交的Runnable任务。
+threadFactory---执行程序创建新线程时使用的工厂。
+handler---由于超出线程范围和队列容量而使执行被阻塞时所使用的处理程序
+
+ThreadPoolExecutor是Executors类的底层实现。
   
-  
-  
-  
-  
-  
+JDK文档：“强烈建议程序员使用较为方便的Executors工厂方法Executors.newCachedThreadPool()（无界线程池，可以进行自动线程回收）、
+Executors.newFixedThreadPool(int)（固定大小线程池）Executors.newSingleThreadExecutor()（单个后台线程），它们均为大多数使用场景预定义了设置。”
+
   
   
   
