@@ -171,8 +171,14 @@ BlockingQueue的选择
             即，任务A1，A2有内部关联，A1需要先运行，那么先提交A1，再提交A2，当使用SynchronousQueue时可以保证，A1必定先被执行前，A2不可能添加入queue中。
 例二：使用无界队列策略，即LinkedBlockingQueue。
         这个就拿newFixedThreadPool来说，根据前文提到的规则：
+          如果运行的线程少于corePoolSize，则Executor始终首选添加新的线程，而不进行排队。
+          如果运行的线程多于或等于corePoolSize，则Executor始终首选将请求加入队列，而不添加新的线程。
+          如果无法将请求加入队列，则创建新的线程，除非创建此线程超过maximumPoolSize，这时，任务将被拒绝。。
+          不像SynchronousQueue那样有其自身的特点，对于无界队列来说，总是可以加入的（资源耗尽另说）。即，永远也不会触发产生新的线程！
+          corePoolSize大小的线程数会一直运行，忙完当前的，就从队列中拿任务开始运行。所以要防止任务疯长，比如任务运行的时间较长，而添加任务的速度远远超过处理任务的时间，而且还不断增加，没多久就爆了。
         
 例三：有界队列，使用ArrayBlockingQueue。
+      这个是最为复杂 的使用，JDK不推荐使用，与上面的相比，最大的特点是可以防止资源耗尽。
 
   
   
