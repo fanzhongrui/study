@@ -49,6 +49,16 @@ VM启动时会有一个由主方法（public static void main(){}）所定义的
 线程状态转换
 就绪状态、运行状态、阻塞状态
 
+
+wait和sleep比较：
+    sleep方法有：sleep(long millis),sleep(long millis, long nanos),调用sleep方法后，当前线程进入休眠期，暂停执行，但该线程继续拥有监视资源的所有权。到达休眠时间后线程将继续执行，直到完成。
+        若在休眠另一线程中中断该线程，则该线程退出。
+    wait方法有：wait(),wait(long timeout),wait(long timeout, long nanos),调用wait方法后，该线程放弃监视资源的所有权进入等待状态；
+        wait():等待有其他的线程调用notify（）或notifyAll（）进入调度状态，与其他线程共同争夺监视。wait()相当于wait(0),wait(0,0)
+        wait(long timeout):当其他线程调用notif()或者notifyAll()，或时间到达timeout毫秒，或有其他某线程中断该线程，则该线程进入调度状态。
+        wait(long timeout, long nanos):相当于wait(1000000*timeout+nanos),只不过时间单位为纳秒。
+    
+
 线程控制的基本方法
     isAlive():判断线程是否还“活”着，即线程是否还未终止
     getPriority():获得线程的优先级数值
