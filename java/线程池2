@@ -23,4 +23,5 @@
           DiscardOldestPolicy：丢弃队列里最近的一个任务，并执行当前任务。
           DiscardPolicy：不处理，丢弃掉。
           也可以根据应用场景需要来实现RejectedExecutionHandler接口自定义策略。如记录日志或持久化不能处理的任务。
-        
+    keepAliveTime（线程活动保持时间）：线程池的工作线程空闲后，保持存活的时间。所以如果任务很多，并且每个任务执行的时间比较短，可以调大这个时间，提高线程的利用率。
+    TimeUnit（线程活动保持时间的单位）：可选的单位有天（Days）、小时（Hours）、分钟（Minutes）、毫秒（Millisecond）、微秒（Microseconds，千分之一毫秒）和毫微秒（Nanoseconds，千分之一微秒）。
