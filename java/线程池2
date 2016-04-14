@@ -15,5 +15,12 @@
         SynchronousQueue：一个不存储元素的阻塞队列。每个插入操作必须等到另一个线程调用移除操作，否则插入操作一直处于阻塞状态，吞吐量通常要高于LinkedBlockingQueue，静态工厂方法Executors.newCachedThreadPool使用了这个队列。
         PriorityBlockingQueue：一个具有优先级的无限阻塞队列。
     maximumPoolSize（线程池最大大小）：线程池允许创建的最大线程数。如果队列满了，并且已创建的线程数小于最大线程数，则线程池会再创建新的线程执行任务。但如果使用了无界的任务队列这个参数就没什么效果了。
-    ThreadFactory：用于
+    ThreadFactory：用于设置创建线程的工厂，可以通过 线程工厂给每个创建出来的线程设置更有意义的名字。
+    RejectedExecutionHandler（饱和策略）：当队列和线程池都满了，说明线程池处于饱和状态，那么必须采取一种策略处理提交的新任务。这个策略默认情况下是AbortPolicy，表示无法处理新任务时抛出异常。
+        JDK1.5提供的四种策略：
+          AbortPolicy：直接抛出异常。
+          CallerRunsPolicy:只用调用者所在线程来运行任务。
+          DiscardOldestPolicy：丢弃队列里最近的一个任务，并执行当前任务。
+          DiscardPolicy：不处理，丢弃掉。
+          也可以根据应用场景需要来实现RejectedExecutionHandler接口自定义策略。如记录日志或持久化不能处理的任务。
         
