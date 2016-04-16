@@ -1,0 +1,27 @@
+数据缓存区和数据存储层的接口————良好的接口层抽象
+
+通过研究f_smgr数据结构，可以清晰分解出如下IO函数需要的操作：
+
+接口名称        接口下函数      功能
+smgr_init       mdinit
+smgr_create     mdcreate
+smgr_read       mdread
+smgr_prefetch
+smgr_write
+smgr_nblocks
+smgr_extend
+smgr_truncate
+smgr_immedsync
+smgr_pre_ckpt
+smgr_sync
+smgr_post_ckpt
+smgr_exists
+smgr_unlink
+smgr_close
+smgr_shutdown
+
+以上函数，init对应shutdown，open对应close，read对应write，create对应unlink。
+其他操作，是一些辅助类型的操作，但是必要。如，计算块的个数、文件扩展、截断、文件是否存在等等。
+注意理解这些操作就能理解一个接口层抽象后，可以支持哪些操作了。
+在数据缓冲区改进方式中曾提出，使用异步IO改进数据库系统的效率，
+如果改造存储层，则可以先从这一层做起，但接口的抽象基本类似于上述内容。
