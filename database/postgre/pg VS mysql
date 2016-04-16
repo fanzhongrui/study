@@ -1,0 +1,7 @@
+为什么选择postgre而不是mysql？
+  
+  ANSI兼容性：mysql支持非标准扩展，pg平台只支持标准扩展；
+  ACID遵从性：pg有一个存储引擎，而mysql有9个，但只有MyIsam和Innodb与大部分用户有关，其中，后者为默认存储引擎。Innodb和pg都完全遵循ACID，差别不大。
+  无锁表修改：MyIsam使用表级锁来提升速度，这会导致写互斥。但pg和Innodb据使用行级锁，差别不大；
+  子查询：这是mysql的弱点，但pg对表连接支持得更好，尤其是mysql不支持全外连接，因此，pg这方面胜过mysql
+  json支持和nosql：pg增加json支持，与传统的关系型数据库相比，它提供了更多数据存储灵活性，因此，这方面pg胜过mysql。
