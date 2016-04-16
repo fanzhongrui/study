@@ -2,10 +2,17 @@ postgre数据存储————存储层概述
 
 pg存储层的实现，主要分为三部分，存储层和数据库系统的关系，
 参考下表（行数从上到下，是用户访问数据库的过程和数据库管理系统的各模块间的关系层次）：
-层次————————————————层次名称—————————————代码——————————————————————————————说明
-用户接口＋用户命令              psql／JDBC／ODBC                        sql交互工具等
-数据访问层          数据访问层  src／backend／access                    如何识别、读写数据
-数据缓存区层        数据缓冲区  src／backend／storage／buffer／bufmgr.c 缓存数据使得逻辑IO和物理IO分离，有效管理了物理IO操作
+层次————————————————层次名称—————————————————代码——————————————————————————————————————说明
+用户接口＋用户命令                  psql／JDBC／ODBC                            sql交互工具等
+。。。
+数据访问层          数据访问层      src／backend／access                        如何识别、读写数据
+数据缓存区层        数据缓冲区      src／backend／storage／buffer／bufmgr.c     缓存数据使得逻辑IO和物理IO分离，有效管理了物理IO操作
+数据存储层          存储访问接口层  src/backend/storage/smgr/smgr.c             使得存储可以被作为插件引入成为可能
+                                    src/backend/storage/smgr/md.c           
+                    虚拟文件管理层  src/backend/storage/file/fd.c               屏蔽了操作系统对于进程可打开的文件句柄数的限制，对外存文件有效管理
+                    物理IO层        OS的lib库中的函数，如windows下的“_commit”， 调用操作系统层的IO操作
+                                    Linux下的posix_fadvise等，
+                                    还有通常共有的“read和write”等函数
 
 Postgresql数据库系统的主要功能都集中于Postgres程序，入口是Main模块的main函数，在初始化数据集簇，启动数据库服务器时，都将从这里执行。
 
