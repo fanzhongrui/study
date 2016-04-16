@@ -1,0 +1,78 @@
+数据缓冲区和数据存储层之间的接口————存储访问接口层
+
+位于buffer下层的代码，是数据存储层，但数据缓冲区和数据存储层之间，有一个接口存在，位于src／backend／storage／smgr；
+这一接口，规定了数据缓冲区和数据存储层之间如何交互，如何发生关联。
+
+  PG的结构良好，很多层之间，可以很好的分离，这点也体现在了本文所描述的接口之间。
+  接口层，通过抽象，规定了两层之间，发生关联的点；通过定义这些关联的点动作和出入口参数，完整描述了接口层的概貌。
+  在数据缓冲区的文档中，讲述了ReadBufferExtended函数及其调用的ReadBuffer_common子函数中，可能都涉及的、类似smgrXXX函数的调用，
+  如smgrread，这是buf层的函数发现buf中没有相应的数据可向数据访问层提供，则buf管理器直接向数据库存储层要求IO，使得被要求的数据能够进入buf。
+  
+  关键数据结构如下：
+  typedef struct f_smgr
+
+{
+
+       void        (*smgr_init) (void);       /* may be NULL */
+
+       void        (*smgr_shutdown) (void);           /* may be NULL */
+
+       void        (*smgr_close) (SMgrRelation reln, ForkNumber forknum);
+
+       void        (*smgr_create) (SMgrRelation reln, ForkNumber forknum,
+
+                                                                             bool isRedo);
+
+       bool        (*smgr_exists) (SMgrRelation reln, ForkNumber forknum);
+
+       void        (*smgr_unlink) (RelFileNodeBackend rnode, ForkNumber forknum,
+
+                                                                             bool isRedo);
+
+       void        (*smgr_extend) (SMgrRelation reln, ForkNumber forknum,
+
+                                                 BlockNumber blocknum, char *buffer, bool skipFsync);
+
+       void        (*smgr_prefetch) (SMgrRelation reln, ForkNumber forknum,
+
+                                                                               BlockNumber blocknum);
+
+       void        (*smgr_read) (SMgrRelation reln, ForkNumber forknum,
+
+                                                                        BlockNumber blocknum, char *buffer);
+
+       void        (*smgr_write) (SMgrRelation reln, ForkNumber forknum,
+
+                                                 BlockNumber blocknum, char *buffer, bool skipFsync);
+
+       BlockNumber (*smgr_nblocks) (SMgrRelation reln, ForkNumber forknum);
+
+       void        (*smgr_truncate) (SMgrRelation reln, ForkNumber forknum,
+
+                                                                         BlockNumber nblocks);
+
+       void        (*smgr_immedsync) (SMgrRelation reln, ForkNumber forknum);
+
+       void        (*smgr_pre_ckpt) (void);             /* may be NULL */
+
+       void        (*smgr_sync) (void);     /* may be NULL */
+
+       void        (*smgr_post_ckpt) (void);           /* may be NULL */
+
+} f_smgr;
+
+ 
+
+static const f_smgr smgrsw[] = {
+
+       /* magnetic disk */
+
+       {mdinit, NULL, mdclose, mdcreate, mdexists, mdunlink, mdextend,
+
+              mdprefetch, mdread, mdwrite, mdnblocks, mdtruncate, mdimmedsync,
+
+              mdpreckpt, mdsync, mdpostckpt
+
+       }
+
+};
