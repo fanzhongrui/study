@@ -1,0 +1,24 @@
+pg存储引擎源码分析
+  pg的存储系统，向下通过操作系统系统接口访问物理数据，
+  向上为存取系统提供由缓冲区页面及页面上的接口函数。
+  lock manager---> page manager ---> IPC
+                        |
+                        |
+                  buffer manager
+                        |
+                        |
+                  storage manager
+                        |
+                        |
+                  file manager
+                        |
+                        |
+                    (file system)
+  
+  lock manager是锁管理器，IPC是进程间通信，他们实现了存取层对存储层的互斥访问，操作。
+  
+  存储系统各子系统功能如下：
+  Page manager：对缓冲区页面的结构进行定义并提供页面的相关操作
+  Buffer manager：对共享缓冲区和本地缓冲区进行管理
+  Storage manager：屏蔽不同物理设备接口函数的差异，向Buffer manager提供统一的接口。
+  File manager：一般的操作系统只允许一个进程打开256个文件，而pg服务器在工作时需要打开的文件会很多，因此，其使用File manager来封装操作系统文件读写的函数。
