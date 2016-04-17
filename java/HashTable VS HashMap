@@ -1,0 +1,16 @@
+HashTable和HashMap的区别
+
+  1.HashMap不是线程安全的
+    hashmap是一个接口，是map接口的子接口，是将键映射到值的对象，其中键和值都是对象，并且不能包含重复键，但可以包含重复值。
+    HashMap允许null key和null value，而HashTable不允许。
+    
+  2.HashTable是线程安全的一个Collection。
+    HashMap是Hashtable的轻量级实现（非线程安全的实现），他们都完成了Map接口，
+    主要区别在于HashMap允许空（null）键值（key），由于非线程安全，效率上可能高于Hashtable
+    HashMap允许将null作为一个Entry的key或者value，而Hashtable不允许。
+    HashMap把Hashtable的contains方法去掉了，改成containsValue和containsKey。
+    Hashtable继承自Dictionary类，而HashMap是java1.2引进的Map interface的一个实现。
+    
+    最大的不同是，Hashtable的方法是Synchronize的，而HashMap不是，
+    在多个线程访问Hashtable时，不需要自己为它 的方法实现同步，而HashMap就必须为之提供外同步。
+    Hashtable和HashMap采用的hash／rehash算法都大概一样，所以性能不会有很大差异。
