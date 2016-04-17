@@ -1,0 +1,69 @@
+一、索引的类型
+  PostgreSQL提供了多种索引类型：B－Tree、R－Tree、Hash、GisT和GIN。
+  由于它们使用了不同的算法，因此每种索引类型都有其适合的查询类型，
+  缺省时，create index命令将创建B－Tree索引。
+  1.B－Tree
+    create table test｛
+      ID Integer，
+      content varchar；
+    ｝；
+    create index test1_id_index on test（ID）；
+    B－Tree索引主要用于等于和范围查询，特别是当索引列包含操作符“<、<=、=、>＝和>”作为查询条件时，PostgreSQL的查询规划器都会考虑使用B－Tree索引。
+    在使用between、is not null的查询中，PostgreSQL也可以使用B－Tree索引
+    is null 谓词不能使用B－Tree索引。
+    对于基于模式匹配操作符的查询，如like、ilike、～和～＊，仅当模式存在一个常量，且该常量位于模式串的开头时，如col like‘foo％’或col～‘^foo’，索引才会生效，否则将会执行全表扫描如，col like‘％bar’
+    
+  2.R－Tree
+    R－tree索引用Guttman的二次分割算法实现了标准的R－tree，特别适合空间数据
+    create index name on table using RTREE（column）；
+    ————下列操作符之一进行比较的时候：
+        <<, &<, &>, >>, @, ~=, && 
+    PostgreSQL会考虑使用R－tree索引
+    
+  3.Hash
+    create index name on table using hash（column）；
+    散列（Hash）索引只能处理简单的等于比较。
+    当索引列使用等于操作符进行比较时，查询规划器会考虑使用散列索引。
+    注意：PostgreSQL散列索引的性能不比B－tree索引强，但是散列索引的尺寸和构造时间则更差。
+    另外，由于散列索引操作目前没有记录WAL日志，因此一旦发生了数据库崩溃，我们将不得不使用reindex重建散列索引。
+    
+  4.GisT
+    GisT索引不是单独一种索引类型，而是一种架构，可以在这种架构上实现很多不同的索引策略。
+    因此，可以使用GiST索引的特定操作符类型根据索引策略的不同而不同（操作符表）
+    GiST的意思是通用的搜索树（Generalized Search Tree）
+    它是一种平衡的，树状结构的访问方法，在系统中起一个基础的模板，
+    然后可以使用它实现任意索引模式。
+    B＋—trees，R－trees和许多其他的索引模式都可以使用GiST 实现。
+    GiST的一个优点是它允许一种客户化的数据类型和合适的访问方法一起开发，
+    并且是由该数据类型范畴里的专家，而不是数据库专家开发
+  
+  5.GIN：
+    GIN索引是反转索引，它可以处理包含多个键的值（比如数组）。
+    与GiST类似，GIN同样支持用户定义的索引策略，从而可以使GIN索引根据不同的索引策略，而使用特定操作符类型。
+    作为示例，postgreSQL的标准发布中包含了用于一维数组的GIN操作符类型，如：<@、@>、=、&&等
+  
+二、复合索引
+  PostgreSQL中的索引可以定义在数据表的多个字段上，如：
+  create table test2｛
+      major int，
+      minor int，
+      name varchar
+  ｝
+  create index test2_mm_idx on test2(major, minor);
+  在当前的版本中，只有B－tree、GiST和GIN支持复合索引，其中最多可以声明32个字段。
+  1.B－Tree类型的复合索引：
+    在B－Tree类型的复合索引中，该索引字段的任意子集均可用于查询条件，不过，只有当复合索引中的第一个索引字段（最左边）被包含其中时，才可以获得最高效率。
+    
+  2.GiST 类型的复合索引：
+    在GiST类型的复合索引中，只有当第一个索引字段被包含在查询条件中时，才能决定该查询会扫描多少索引数据，而其他索引字段上的条件只是会限制索引返回的条目。
+    加入第一个索引字段上的大多数数据都有相同的键值，那么此时应用GiST索引就会比较低效。
+    
+  3.GIN类型的复合索引：
+    与B－Tree和GiST索引不同的是，GIN复合索引不会受到查询条件中使用了哪些索引字段子集的影响，无论是哪种组合，都会得到相同的效率。
+    
+    使用复合索引应该谨慎。
+    大多数情况下，单一字段上的索引就已经足够了，并且还节约时间和空间。
+    除非表的使用模式非常固定，否则超过三个字段的索引几乎没什么用处。
+    
+  三、组合多个索引
+    
