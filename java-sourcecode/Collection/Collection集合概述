@@ -8,5 +8,9 @@ Collection
   |__Set
   
 整体框架的UML图
-  Iterator
+  Iterator  <-------------------  Collection   <----------------------   Map
+  
+  
+  
+  ListIterator  <--------------   List    Set                   AbstractMap
   
