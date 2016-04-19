@@ -1,0 +1,82 @@
+爬虫：一段自动抓取互联网信息的程序
+学习Python爬虫：
+  Python基础知识
+  Python中urlib和urlib2库的用法
+  Python正则表达式
+  Python爬虫框架Scrapy
+  Python爬虫更高级的功能
+  
+URL的格式由三部分组成：
+  第一部分是协议（或服务方式）
+  第二部分是存有该资源的主机IP地址（有时也包括端口号）
+  第三部分是主机资源的具体地址，如目录和文件名等。
+  
+简单爬虫架构
+
+               |  URL管理器《——————|            |
+               |      |            |            |
+爬虫调度器-----|      |            |            |
+               |  网页下载器————》网页解析器————|——————价值数据
+               |                                |
+               
+  运行流程
+  调度器                  URL管理器           下载器            解析器              应用
+      |---有待爬URL？--》|                    |                 |                   |
+      |-----是/否--------|                    |                 |                   |
+      |-获取1个待爬URL-》|                    |                 |                   |
+      |------URL---------|                    |                 |                   |
+      |                  |                    |                 |                   |
+      |———————————————————下载URL内容———————》|                 |                   |
+      |--------------------URL内容------------|                 |                   |
+  循  |                  |                    |                 |                   |
+  环  |——————————————————————————————————————————解析URL内容——》|                   |
+      |----------------------------------价值数据、新URL列表----|                   |
+      |                   |                   |                 |                   |
+      |————————————————————————————————————————————————————————————收集价值数据——》 |
+      |-新增待爬取URL-——》|                   |                 |                   |
+      |—————————————————————————————————————————————————————————————输出价值数据—》 |
+      
+  URL管理器：管理待抓取URL集合和已抓取URL集合
+      ——防止重复抓取、防止循环抓取
+      ——功能：
+          添加新URL到待爬取集合中
+          判断待添加URL是否在容器中
+          判断是否还有待爬取URL
+          获取待爬取URL
+          将URL从待爬取集合移动到已爬取集合
+          
+  URL管理器实现方式：
+    存储在内存中：
+    存储在关系型数据库中：MSQL
+    缓存数据库中：redis
+    
+  网页下载器：将互联网上URL对应的网页下载到本地的工具
+    Python：urllib2库
+                直接获取网页:
+                          urllib2.urlopen(url)
+                添加data、http header:
+                          urllib2.Request(url)            //创建Request对象
+                          request.add_data('a','1')       //添加数据
+                          request.add_header('User_Agent','Mozilla/5.0')//添加http的header
+                          response = urllib2.urlopen(request)         //发送请求获取结果
+                添加特殊情景的处理器：
+                          HTTPCookieProcessor:需要用户登录的网页|   cj = cookielib.CookieJar()
+                          ProxyHandler:需要代理                 |   opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+                          HTTPSHandler:需要HTTPS加密            |   urllib2.install_opener(opener)
+                          HTTPRedirectHandler:相互自动跳转      |   urllib2.urlopen(url)/urllib2.urlopen(request)
+                    
+          ：requests库
+          
+        
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
