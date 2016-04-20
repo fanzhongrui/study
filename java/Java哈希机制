@@ -47,4 +47,19 @@ HashMap的存储实现
        从上面程序中可以看出：当系统决定存储HashMap中的key-value对时，完全没有考虑Entry中的value，仅仅只是根据key来计算并决定每个Entry的存储位置。
        这也说明：Map集合中的value完全是key的附属，当系统决定了key的存储位置之后，value随之保存在那里即可。
        
-       上面方法提供了一个
+       上面方法提供了一个hashCode()返回值来计算Hash码的方法：hash()，这个方法是一个纯粹的数学计算，其方法如下：
+        static int hash(int h) 
+          { 
+              h ^= (h >>> 20) ^ (h >>> 12); 
+              return h ^ (h >>> 7) ^ (h >>> 4); 
+          }
+      对于任意给定的对象，只要它的hashCode()返回值相同，那么程序调用hash(int  h)方法所计算得到的hash码值总是相同的。
+      接下来程序会调用indexFor(int h, int length)方法来计算该对象应该保存在table数组的哪个索引处。
+        static int indexFor(int h, int length) 
+          { 
+              return h & (length-1); 
+          }
+      这个方法总是通过h & (table.length-1)来得到该对象的保存位置
+      而HashMap底层数组的长度总是2的n次方。
+      当length总是2的倍数时，h & (length - 1)将是一个非常巧妙的设计：
+          假设h=5, length = 16,那么h & (length-1)将得到5；
