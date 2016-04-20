@@ -63,3 +63,10 @@ HashMap的存储实现
       而HashMap底层数组的长度总是2的n次方。
       当length总是2的倍数时，h & (length - 1)将是一个非常巧妙的设计：
           假设h=5, length = 16,那么h & (length-1)将得到5；
+          h=6，length=16，那么h&(length-1)将得到6。。。。。h=15,length=16,那么h&(length-1)将得到15；
+          但是当h=16,length=16时，那么h&(length-1)将得到0；
+          当h=17,length=16,那么h&length-1将得到1
+          这样保证计算得到的索引值总是位于table数组的索引之内。
+          
+      当程序试图将一个key-value对放入HashMap中时，程序首先根据该key的hashCode()返回值决定该Entry的存储位置：
+          如果两个Entry的key的hashCode()
