@@ -142,9 +142,137 @@ Hash算法的性能选项
               因此可能出现的情况是：HashMap的bucket中只有一个Entry，但这个Entry指向另一个Entry————这就形成了一个Entry链。
               
   HashMap的读取实现
-        当HashMap的每个bucket里存储的Entry只是单个Entry————也就是没有通过指针产生Entry链时，
-        
-        
+        当HashMap的每个bucket里存储的Entry只是单个Entry————也就是没有通过指针产生Entry链时，此时的HashMap具有最好的性能：
+              当程序通过key取对应value时，系统只要先计算出该key的hashCode（）返回值，在根据该hashCode返回值找出该key在table数组中的索引，然后取出该索引处的Entry，最后返回该key对应的value即可。
+                  public V get(Object key) 
+                   { 
+                  	 // 如果 key 是 null，调用 getForNullKey 取出对应的 value 
+                  	 if (key == null) 
+                  		 return getForNullKey(); 
+                  	 // 根据该 key 的 hashCode 值计算它的 hash 码
+                  	 int hash = hash(key.hashCode()); 
+                  	 // 直接取出 table 数组中指定索引处的值，
+                  	 for (Entry<K,V> e = table[indexFor(hash, table.length)]; 
+                  		 e != null; 
+                  		 // 搜索该 Entry 链的下一个 Entr 
+                  		 e = e.next) 		 // ①
+                  	 { 
+                  		 Object k; 
+                  		 // 如果该 Entry 的 key 与被搜索 key 相同
+                  		 if (e.hash == hash && ((k = e.key) == key 
+                  			 || key.equals(k))) 
+                  			 return e.value; 
+                  	 } 
+                  	 return null; 
+                   }
+            从上面的代码中可以看出，如果HashMap的每个bucket里只有一个Entry时，HashMap可以根据索引，快速地取出该bucket里的Entry；
+              在发生“Hash冲突”的情况下，单个bucket里存储的不是一个Entry，而是一个Entry链，系统只能必须按顺序遍历每个Entry，直到找到想搜索的Entry为止————
+              如果恰好要搜索的Entry位于该Entry链的最末端（该Entry最早放入该bucket中），那系统必须循环到最后才能找到该元素。
+          
+            HashMap在底层将key-value当成一个整体进行处理，这个整体就是一个Entry对象。
+              HashMap底层采用一个Entry[]数组来保存所有的key-value对，当需要存储一个Entry对象时，会根据hash算法来决定其存储位置；
+              当需要取出一个Entry时，也会根据hash算法找到其存储位置，直接取出该Entry。
+              由此可见：HashMap之所以能快速存、取所包含的Entry，完全类似于一个生活哲理：不同的东西要放在不同的位置，需要时才能快速找到它
+              
+            当创建HashMap时，有一个默认的负载因子（load factor），其默认值为0.75，这是时间和空间成本上的一种折衷：增大负载因子可以减少hash表（即Entry数组）所占用的内存空间，
+              但会增加查询数据的时间开销，而查询是最频繁的操作（HashMap的get()与put()方法都要用到查询）；
+              减小负载因子会提高数据查询的性能，但会增加hash表所占用的内存空间。
+            
+            我们可以在创建HashMap时根据实际需要适当地调整load factor的值，如果程序比较关心空间开销、内存比较紧张，可以适当地增加负载因子；
+                如果程序比较关心时间开销，内存比较宽裕则可以适当地减少负载因子。
+                通常情况下，程序员无需改变负载因子的值。
+                
+            如果开始就知道HashMap会保存多个key-value对，可以在创建时就使用较大的初始化容量，如果HashMap中Entry的数量一直不会超过极限容量（capacity*load factor），
+              HashMap就无需调用resize()方法重新分配table数组，从而保证较好的性能。当然，开始就将初始容量设置太高可能会浪费空间（系统需要创建一个长度为capacity的Entry数组），
+              因此创建HashMap时初始化容量设置也需小心对待。
+      
+HashSet的实现
+    对于HashSet而言，它是基于HashMap实现的，Hashset底层采用HashMap来保存所有元素，
+    public class HashSet<E> 
+    	 extends AbstractSet<E> 
+    	 implements Set<E>, Cloneable, java.io.Serializable 
+     { 
+    	 // 使用 HashMap 的 key 保存 HashSet 中所有元素
+    	 private transient HashMap<E,Object> map; 
+    	 // 定义一个虚拟的 Object 对象作为 HashMap 的 value 
+    	 private static final Object PRESENT = new Object(); 
+    	 ... 
+    	 // 初始化 HashSet，底层会初始化一个 HashMap 
+    	 public HashSet() 
+    	 { 
+    		 map = new HashMap<E,Object>(); 
+    	 } 
+    	 // 以指定的 initialCapacity、loadFactor 创建 HashSet 
+    	 // 其实就是以相应的参数创建 HashMap 
+    	 public HashSet(int initialCapacity, float loadFactor) 
+    	 { 
+    		 map = new HashMap<E,Object>(initialCapacity, loadFactor); 
+    	 } 
+    	 public HashSet(int initialCapacity) 
+    	 { 
+    		 map = new HashMap<E,Object>(initialCapacity); 
+    	 } 
+    	 HashSet(int initialCapacity, float loadFactor, boolean dummy) 
+    	 { 
+    		 map = new LinkedHashMap<E,Object>(initialCapacity 
+    			 , loadFactor); 
+    	 } 
+    	 // 调用 map 的 keySet 来返回所有的 key 
+    	 public Iterator<E> iterator() 
+    	 { 
+    		 return map.keySet().iterator(); 
+    	 } 
+    	 // 调用 HashMap 的 size() 方法返回 Entry 的数量，就得到该 Set 里元素的个数
+    	 public int size() 
+    	 { 
+    		 return map.size(); 
+    	 } 
+    	 // 调用 HashMap 的 isEmpty() 判断该 HashSet 是否为空，
+    	 // 当 HashMap 为空时，对应的 HashSet 也为空
+    	 public boolean isEmpty() 
+    	 { 
+    		 return map.isEmpty(); 
+    	 } 
+    	 // 调用 HashMap 的 containsKey 判断是否包含指定 key 
+    	 //HashSet 的所有元素就是通过 HashMap 的 key 来保存的
+    	 public boolean contains(Object o) 
+    	 { 
+    		 return map.containsKey(o); 
+    	 } 
+    	 // 将指定元素放入 HashSet 中，也就是将该元素作为 key 放入 HashMap 
+    	 public boolean add(E e) 
+    	 { 
+    		 return map.put(e, PRESENT) == null; 
+    	 } 
+    	 // 调用 HashMap 的 remove 方法删除指定 Entry，也就删除了 HashSet 中对应的元素
+    	 public boolean remove(Object o) 
+    	 { 
+    		 return map.remove(o)==PRESENT; 
+    	 } 
+    	 // 调用 Map 的 clear 方法清空所有 Entry，也就清空了 HashSet 中所有元素
+    	 public void clear() 
+    	 { 
+    		 map.clear(); 
+    	 } 
+    	 ... 
+     }
+    由源码可以看出，Hashset的实现只是封装了一个HashMap对象来存储所有的集合元素，
+      所有放入HashSet中的集合元素实际上有HashMap的key来保存，
+      而HashMap的value则存储了一个present，它是一个静态的Object对象。
+      
+    HashSet的绝大部分方法都是通过调用HashMap的方法实现的，因此HashSet和HashMap两个集合在实现本质上是相同的。
+    
+HashMap的put与HashSet的add
+    由于HashSet的add()方法添加集合元素实际上转变为调用HashMap的put（）方法来添加key-value对，
+      当新放入HashMap的Entry中key与集合中原有Entry的key相同（hashcode（）返回值相等，通过equals比较也返回true），新添加的Entry的value将覆盖原来Entry的value，但key不会有任何改变，
+      因此如果向HashSet中添加一个已经存在的元素，新添加的集合元素（底层由HashMap的key保存）不会覆盖已有的集合元素。
+      
+  HashSet判断两个对象相等的标准除了要求通过equals（）方法比较返回true之外，还要求两个对象的hashcode（）返回值相等。
+  所以如果类只重写equals()方法没有重写hashCode()方法，两个所有属性都相同的同类对象的hashCode()返回值并不同，所以HashSet会把它们当成2个对象。
+  
+当我们试图把某个类的对象当成HashMap的key，或试图将这个类的对象放入HashSet中保存时，重写该类 的equals（Object obj）方法和hashCode()方法很重要，
+  而且这两个方法的返回值必须保持一致：当该类的两个对象的hashCode（）返回值相同时，他们通过equals（）方法比较也应该返回true。
+  通常来说，所有参与计算hashcode（）返回值的关键属性，都应该用于作为equals()比较的标准。
         
         
         
