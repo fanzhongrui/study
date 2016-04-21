@@ -72,4 +72,6 @@ HashMap的存储实现
           如果两个Entry的key的hashCode()返回值相同，那么它们的存储位置相同。
       如果这两个Entry的key通过equals比较返回true，新添加Entry的value将覆盖集合中原有Entry的value，但key不会覆盖。
       如果这两个Entry的key通过equals比较返回false，新添加的Entry将与集合中原有Entry形成Entry链，而且新添加的Entry位于Entry链的头部。
+      当向HashMap中添加key-value对，由其key的hashCode()返回值决定该key-value对（就是Entry对象）的存储位置。
+      当两个Entry对象的key的hashCode()返回值相同时，将由key通过equals()比较值决定是采用覆盖行为（返回true），还是产生Entry链（返回false）
       
