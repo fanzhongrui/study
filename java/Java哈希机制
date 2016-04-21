@@ -73,5 +73,81 @@ HashMap的存储实现
       如果这两个Entry的key通过equals比较返回true，新添加Entry的value将覆盖集合中原有Entry的value，但key不会覆盖。
       如果这两个Entry的key通过equals比较返回false，新添加的Entry将与集合中原有Entry形成Entry链，而且新添加的Entry位于Entry链的头部。
       当向HashMap中添加key-value对，由其key的hashCode()返回值决定该key-value对（就是Entry对象）的存储位置。
-      当两个Entry对象的key的hashCode()返回值相同时，将由key通过equals()比较值决定是采用覆盖行为（返回true），还是产生Entry链（返回false）
+      当两个Entry对象的key的hashCode()返回值相同时，将由key通过equals()比较值决定是采用覆盖行为（返回true），还是产生Entry链（返回false）。
+      上面程序中还调用了addEntry(hash, key, value, i);代码，其中addEntry是HashMap提供的一个包访问权限的方法，该方法仅用于添加一个key-value对。
+          void addEntry(int hash, K key, V value, int bucketIndex) 
+              { 
+                  // 获取指定 bucketIndex 索引处的 Entry 
+                  Entry<K,V> e = table[bucketIndex]; 	 // ①
+                  // 将新创建的 Entry 放入 bucketIndex 索引处，并让新的 Entry 指向原来的 Entry 
+                  table[bucketIndex] = new Entry<K,V>(hash, key, value, e); 
+                  // 如果 Map 中的 key-value 对的数量超过了极限
+                  if (size++ >= threshold) 
+                      // 把 table 对象的长度扩充到 2 倍。
+                      resize(2 * table.length); 	 // ②
+              }
+        上面方法的代码中包含了一个非常优雅的设计：系统总是将新添加的Entry对象放入table数组的bucketIndex索引处————
+            如果bucketIndex索引处已经有了一个Entry对象，那新添加的Entry对象指向原有的Entry对象（产生一个Entry链），
+            如果bucketIndex索引处没有Entry对象，即e变量是null，也就是新放入的Entry对象指向null，也就是没有产生Entry链。
+            
+Hash算法的性能选项
+    由以上代码可以看出，在同一个bucket存储Entry链的情况下，新放入的Entry总是位于bucket中，而最早放入该bucket中的Entry则位于这个Entry链的最末端。
+    
+    上面程序中还有这样两个变量：
+        size:该变量保存了该HashMap中所包含的key-value对的数量。
+        threshold：该变量包含了HashMap能容纳的key-value对的极限，它的值等于HashMap的容量乘以负载因子（load factor）。
+        
+    当Size++ >= threshold时，HashMap会自动调用resize方法扩充HashMap的容量。每扩充一次，HashMap的容量就增大一倍。
+    
+    使用的table数组其实就是一个普通数组，每个数组都有一个固定的长度，这个数组的长度就是HashMap的容量。
+    HashMap包含如下几个构造器：
+        HashMap():构建一个初始容量为16，负载因子为0.75的hashMap
+        HashMap（int initialCapacity）：构建一个初始容量为initialCapacity，负载因子为0.75的HashMap
+        HashMap（int initialCapacity, float loadFactor）：以指定初始容量、指定的负载因子创建一个HashMap。
+    
+    当创建一个HashMap时，系统会自动创建一个table数组来保存HashMap中的Entry，下面是HashMap中一个构造器的代码：
+        // 以指定初始化容量、负载因子创建 HashMap 
+         public HashMap(int initialCapacity, float loadFactor) 
+         { 
+        	 // 初始容量不能为负数
+        	 if (initialCapacity < 0) 
+        		 throw new IllegalArgumentException( 
+        		"Illegal initial capacity: " + 
+        			 initialCapacity); 
+        	 // 如果初始容量大于最大容量，让出示容量
+        	 if (initialCapacity > MAXIMUM_CAPACITY) 
+        		 initialCapacity = MAXIMUM_CAPACITY; 
+        	 // 负载因子必须大于 0 的数值
+        	 if (loadFactor <= 0 || Float.isNaN(loadFactor)) 
+        		 throw new IllegalArgumentException( 
+        		 loadFactor); 
+        	 // 计算出大于 initialCapacity 的最小的 2 的 n 次方值。
+        	 int capacity = 1; 
+        	 while (capacity < initialCapacity) 
+        		 capacity <<= 1; 
+        	 this.loadFactor = loadFactor; 
+        	 // 设置容量极限等于容量 * 负载因子
+        	 threshold = (int)(capacity * loadFactor); 
+        	 // 初始化 table 数组
+        	 table = new Entry[capacity]; 			 // ①
+        	 init(); 
+         }
+        
+        上面代码中包含了一个简洁的代码实现：找出大于initialCapacity的，最小的2的n次方值，并将其作为HashMap的实际容量（由capacity变量保存）。
+         table的实质就是一个数组，一个长度为capacity的数组。
+          对于HashMap及其子类而言，它们采用Hash算法来决定集合中元素的存储位置。
+          当系统开始初始化HashMap时，系统会创建一个长度为capacity的Entry数组，这个数组里可以存储元素的位置被称为“桶（bucket）”，每个bucket都有其指定索引，系统可以根据其索引快速访问该bucket里存储的元素。
+          
+          无论何时，HashMap的每个“桶”只存储一个元素（即一个Entry），由于Entry对象可以包含一个引用变量（就是Entry构造器的最后一个参数）用于指向下一个Entry，
+              因此可能出现的情况是：HashMap的bucket中只有一个Entry，但这个Entry指向另一个Entry————这就形成了一个Entry链。
+              
+  HashMap的读取实现
+        当HashMap的每个bucket里存储的Entry只是单个Entry————也就是没有通过指针产生Entry链时，
+        
+        
+        
+        
+        
+        
+        
       
