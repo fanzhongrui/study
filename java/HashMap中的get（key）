@@ -35,6 +35,46 @@
     }
     
     (n - 1) & hash得到hash槽的索引，获取该槽内的第一个Node, 先判断第一个Node的关键字是否符合key，若符合则返回
-    如果不符合，继续判断此Node是否是TreeNode类型，如果是，按树遍历的方式去查找关键字；
+    如果不符合，继续判断此Node是否是TreeNode类型，如果是，按红黑树遍历的方式去查找关键字；
         如果不是，按链表的方式继续向下遍历
     如果没找到符合的，返回null。
+    
+    
+红黑树查找关键字的遍历方法
+        /**
+         * 调用树的find()函数
+         */
+        final TreeNode<K,V> getTreeNode(int h, Object k) {
+            return ((parent != null) ? root() : this).find(h, k, null);
+        }
+         /**
+         * 从根节点p开始查找指定hash值和关键字key的结点
+         * 当第一次使用比较器比较关键字时，参数kc储存了关键字key的 比较器类别
+         */
+        final TreeNode<K,V> find(int h, Object k, Class<?> kc) {
+            TreeNode<K,V> p = this;
+            do {
+                int ph, dir; K pk;
+                TreeNode<K,V> pl = p.left, pr = p.right, q;
+                if ((ph = p.hash) > h)			//如果给定哈希值小于当前节点的哈希值，进入左节点
+                    p = pl;
+                else if (ph < h)				//如果大于，进入右结点
+                    p = pr;
+                else if ((pk = p.key) == k || (k != null && k.equals(pk)))	//如果哈希值相等，且关键字相等，则返回当前节点
+                    return p;
+                else if (pl == null)		//如果左节点为空，则进入右结点
+                    p = pr;
+                else if (pr == null)		//如果右结点为空，则进入左节点
+                    p = pl;
+                else if ((kc != null ||
+                          (kc = comparableClassFor(k)) != null) &&
+                         (dir = compareComparables(kc, k, pk)) != 0)		//如果不按哈希值排序，而是按照比较器排序，则通过比较器返回值决定进入左右结点
+                    p = (dir < 0) ? pl : pr;
+                else if ((q = pr.find(h, k, kc)) != null)		//如果在右结点中找到该关键字，直接返回
+                    return q;
+                else
+                    p = pl;								//进入左节点
+            } while (p != null);
+            return null;
+        }
+     
