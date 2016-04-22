@@ -1,0 +1,40 @@
+  jdk1.8
+  HashMap.java中获取指定关键字对应的值value方法get(Object key)
+  
+    /* 返回指定关键字的值value，没有则返回null
+     */
+    public V get(Object key) {
+        Node<K,V> e;
+        return (e = getNode(hash(key), key)) == null ? null : e.value;
+    }
+
+    /**
+     * 实现Map.get()及其相关方法
+     * @param hash hash for key
+     * @param key the key
+     * @return the node, or null if none
+     */
+    final Node<K,V> getNode(int hash, Object key) {
+        Node<K,V>[] tab; Node<K,V> first, e; int n; K k;
+        if ((tab = table) != null && (n = tab.length) > 0 &&
+            (first = tab[(n - 1) & hash]) != null) {
+            if (first.hash == hash && 						// 始终检查第一个结点
+                ((k = first.key) == key || (key != null && key.equals(k))))
+                return first;
+            if ((e = first.next) != null) {
+                if (first instanceof TreeNode)
+                    return ((TreeNode<K,V>)first).getTreeNode(hash, key);
+                do {
+                    if (e.hash == hash &&
+                        ((k = e.key) == key || (key != null && key.equals(k))))
+                        return e;
+                } while ((e = e.next) != null);
+            }
+        }
+        return null;
+    }
+    
+    (n - 1) & hash得到hash槽的索引，获取该槽内的第一个Node, 先判断第一个Node的关键字是否符合key，若符合则返回
+    如果不符合，继续判断此Node是否是TreeNode类型，如果是，按树遍历的方式去查找关键字；
+        如果不是，按链表的方式继续向下遍历
+    如果没找到符合的，返回null。
