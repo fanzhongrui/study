@@ -1,0 +1,54 @@
+HashMap中的put(Object key, Object value)方法实现
+
+  /**
+     * 实现Map.put及其相关方法
+     * @param hash hash for key
+     * @param key the key
+     * @param value the value to put
+     * @param onlyIfAbsent 若为 true, 不改变已有关键字对应的值
+     * @param evict if false, the table is in creation mode.
+     * @return previous value, or null if none
+     */
+    final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
+                   boolean evict) {
+        Node<K,V>[] tab; Node<K,V> p; int n, i;
+        if ((tab = table) == null || (n = tab.length) == 0)		//如果table数组尚未创建（第一次调用put），则新建table数组
+            n = (tab = resize()).length;
+        if ((p = tab[i = (n - 1) & hash]) == null)				//table[i]中没有结点则创建新节点
+            tab[i] = newNode(hash, key, value, null);
+        else {
+            Node<K,V> e; K k;
+            if (p.hash == hash &&
+                ((k = p.key) == key || (key != null && key.equals(k)))) //如果p=table[i]的关键字与给定关键字key相同，则替换旧值
+                e = p;
+            else if (p instanceof TreeNode)								//如果结点类型是TreeNode，则向红黑树中插入新节点
+                e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
+            else {
+            	//遍历链表，查找给定关键字
+                for (int binCount = 0; ; ++binCount) {
+                    if ((e = p.next) == null) {				//如果没有找到，则创建新节点
+                        p.next = newNode(hash, key, value, null);
+                        if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st  创建新节点后若超出树形化阈值，则转换为树形存储
+                            treeifyBin(tab, hash);
+                        break;
+                    }
+                    if (e.hash == hash &&
+                        ((k = e.key) == key || (key != null && key.equals(k)))) //如果找到关键字相同的结点
+                        break;
+                    p = e;
+                }
+            }
+            if (e != null) { 			// e不为空，即map中存在要添加的关键字
+                V oldValue = e.value;
+                if (!onlyIfAbsent || oldValue == null)
+                    e.value = value;
+                afterNodeAccess(e);
+                return oldValue;
+            }
+        }
+        ++modCount;					//修改map结构的操作数加1
+        if (++size > threshold)		//如果超出重构阈值，需要重新分配空间
+            resize();
+        afterNodeInsertion(evict);
+        return null;
+    }
