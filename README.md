@@ -1,2 +1,2 @@
 # study
-something record the note on the road of my study
+此项目中主要记录找工作过程中准备的相关东西
