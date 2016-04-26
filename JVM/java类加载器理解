@@ -13,4 +13,11 @@
           extension classloader是system classloader的parent。
           
     bootstrap classloader
-      它是最原始的类加载器，并不是由Java代码写的，
+      它是最原始的类加载器，并不是由Java代码写的，是由原生代码编写的。
+      Java有一次编译、所有平台运行的效果，就是因为它写了一份功能相同，但针对不同平台不同语言实现的底层代码。
+      它负责加载Java核心库。
+      可以运行以下代码，看看自己本地的Java核心库位置：
+      URL[] urls = sun.misc.Launcher.getBootstrapClassPath().getURLs();
+      for( int i = 0; i < urls.length; i++){
+          System.out.println(urls[i].toExternalForm());
+      }
