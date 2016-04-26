@@ -21,3 +21,7 @@
       for( int i = 0; i < urls.length; i++){
           System.out.println(urls[i].toExternalForm());
       }
+
+    extension classloader
+        它用来加载JRE的扩展目录（ JAVA_HOME/jre/lib/ext或者java.ext.dirs系统属性指定的）JAR的类包。
+        因为它是bootstrap classloader加载的，
