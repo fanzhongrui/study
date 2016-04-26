@@ -55,10 +55,24 @@
                       c = findBootstrapClassOrNull(name);
                   }
               } catch ( ClassNotFoundException e ) {
-                  //
-                  //
+                  //ClassNotFoundException thrown if class not found
+                  //from the non-null parent class loader
               }
-              if (c == null)
+              if (c == null) {
+                  //if still not found, then invoke findClass in order
+                  //to find the class
+                  c = findClass(name);
+              }
+          }
+          if (resolve) {
+              resolvClass(c);
+          }
+          return c;
+      }
+      
+  举例说明，类加载器加载类A的过程：
+    1.判断是否已经加载过，在cache里面查找，若有，跳7；否则下一步
+    2.
                       
                       
                       
