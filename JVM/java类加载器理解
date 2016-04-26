@@ -41,5 +41,27 @@
       委托机制：类加载器在加载类A时，会优先让父加载器加载，
       当父加载器加载不到，再找父父加载器，一直找到bootstrap classloader，才自己去相关的路径去寻找加载。
       以下是ClassLoader的源码：
-      
+      protected synchronized Class<?> loadClass(String name, boolean resolve)
+          throws ClassNotFoundException {
+          //first, check if the class has already been loaded
+          Class c = findLoadedClass(name);
+          if(c == null) {
+              try {
+                  if( parent != null ){
+                      //从父加载器加载
+                      c = parent.loadClass(name, false);
+                  } else {
+                      //从bootstrap loader加载
+                      c = findBootstrapClassOrNull(name);
+                  }
+              } catch ( ClassNotFoundException e ) {
+                  //
+                  //
+              }
+              if (c == null)
+                      
+                      
+                      
+                      
+                      
       
