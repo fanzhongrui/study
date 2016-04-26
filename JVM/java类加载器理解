@@ -72,7 +72,20 @@
       
   举例说明，类加载器加载类A的过程：
     1.判断是否已经加载过，在cache里面查找，若有，跳7；否则下一步
-    2.
+    2.判断当前加载器是否有父加载器，若无，则当前为ext classloader，跳去4，否则，下一步
+    3.请求父加载器加载该类，若加载成功，跳7；若不成功，即父加载器不能找到该类，跳2
+    4.请求JVM的bootstrap classloader加载，若加载成功，跳7；若失败，跳5
+    5.当前加载器自己加载，若成功，跳7；否则，跳6
+    6.抛出ClassNotFoundException
+    7.返回Class
+    
+  编写自己的类加载器
+      Java加载类的过程，实质上是调用loadClass()方法，
+      loadClass（）中调用findLoadedClass()方法来检查该类是否已经被加载过，
+      如果没有就会调用父加载器的loadClass（），如果父加载器无法加载该类，就调用findClass()来查找该类。
+      
+      所以需要新建MyClassLoader继承java.lang.ClassLoader，重写其中的findClass()方法。
+      主要是重新设计查找字节码文件的方案，然后调用definedClass来返回。
                       
                       
                       
