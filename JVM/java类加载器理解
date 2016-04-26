@@ -6,3 +6,11 @@
     该类就是java.lang.Class的一个实例。
     
   类加载器的组织结构
+      Java有三个初始类加载器，当Java虚拟机启动时，它们会按照以下顺序启动：
+          Bootstrap classloader  ——》extension classloader  ————》system classloader
+      三者的关系：
+          bootstrap classloader是extension classloader的parent，
+          extension classloader是system classloader的parent。
+          
+    bootstrap classloader
+      它是最原始的类加载器，并不是由Java代码写的，
