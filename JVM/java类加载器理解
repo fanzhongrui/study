@@ -2,3 +2,7 @@
     Java文件经过编译器编译后变成字节码文件（.class文件），
     类加载器（ClassLoader）读取.class文件，并且转换成java.lang.Class的一个实例，
     最后通过newInstance方法创建该类的一个对象。
+    ClassLoader的作用就是根据一个类名，找到对应的字节码，根据这些字节码定义出对应的类，
+    该类就是java.lang.Class的一个实例。
+    
+  类加载器的组织结构
