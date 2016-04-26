@@ -24,4 +24,14 @@
 
     extension classloader
         它用来加载JRE的扩展目录（ JAVA_HOME/jre/lib/ext或者java.ext.dirs系统属性指定的）JAR的类包。
-        因为它是bootstrap classloader加载的，
+        因为它是bootstrap classloader加载的，所以，当运行：
+        ClassLoader extensionClassloader = ClassLoader.getSystemClassLoader.getParent();
+        System.out.println("the parent of extension classloader:"+ extensionClassloader.getParent());
+        
+      输出的是：the parent of extension classloader：null
+      
+    System classloader
+        它用于加载classpath目录下的jar包，我们写的Java类，一般都是由它加载，除非自己制定个人的类加载器。
+        
+  全盘负责委托机制
+      
