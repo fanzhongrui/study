@@ -70,7 +70,50 @@ TreeMap源码分析——基础分析
           
           containsValue(Object value)涉及到了getFirstEntry()方法和successor(Entry<K,V> e)方法。getFirstEntry()是获取第一个结点，
               successor(Entry<K,V> e)是获取结点e的后继结点，在for循环中配合使用getFirstEntry()方法和successor(Entry<K,V> e)及e!=null是遍历树的一种方法。
-              getFirstEntry()实际上
+              getFirstEntry()实际上是获取整棵树中“最左”的结点（第一个结点具体指哪一个结点和树的遍历次序有关，如果是先根遍历，则第一个结点是根节点）。
+                    又因为红黑树是排序的树，所以“最左”的结点也是值最小的结点。
+              getLastEntry(),获取最右的结点
+              
+          TreeMap中还提供了获取并移除最小和最大结点的两个方法：pollFirstEntry()和pollLastEntry(),分别通过getFirstEntry()和getLastEntry()获取结点，
+              ExportEntry(TreeMap.Entry<K, V> e)是创建一个用于返回的删除结点对象。
+                static <K,V> Map.Entry<K,V> exportEntry(TreeMap.Entry<K,V> e) {
+                  return e == null? null :
+                  new AbstractMap.SimpleImmutableEntry<K,V>(e);
+                 }
+              返回了一个SimpleImmutableEntry对象，调用的构造方法如下：
+                public SimpleImmutableEntry(Entry<? extends K, ? extends V> entry) {
+                    this.key   = entry.getKey();
+                    this.value = entry.getValue();
+                }
+              可以看到返回的结点内容只包含Key和value。
+              而其他具体的获取键、值、键值对的方法。
+                  public Map.Entry<K,V> ceilingEntry(K key) {
+                       return exportEntry(getCeilingEntry(key));
+                   }
+                   public K ceilingKey(K key) {
+                       return keyOrNull(getCeilingEntry(key));
+                   }
+              上面这两个方法只是对exportEntry和keyOrNull的调用。keyOrNull根据传入的Entry是否为null，选择返回null或Entry的Key
+                  // 获取最小的节点的key
+                  public K firstKey() {
+                      return key(getFirstEntry());
+                  }
+                  // 获取最大节点的key
+                  public K lastKey() {
+                      return key(getLastEntry());
+                  }
+                  // 获取最小的键值对
+                 public Map.Entry<K,V> firstEntry() {
+                     return exportEntry(getFirstEntry());
+                 }
+                 // 获取最大的键值对
+                 public Map.Entry<K,V> lastEntry() {
+                     return exportEntry(getLastEntry());
+                 }
+              
+              getFloorEntry和getHigherEntry方法遍历和寻找结点的方法类似，区别在于getFloorEntry寻找的是小于等于，优先返回小于的结点，
+                而getHigherEntry寻找的是严格大于的结点，不包括等于的情况。
+              
               
           
           
