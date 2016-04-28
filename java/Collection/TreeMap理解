@@ -42,13 +42,21 @@ TreeMap源码分析——基础分析
             private transient int modCount = 0;
             
           TreeMap中的put()方法和其他Map的put（）方法一样，向Map中加入键值对，若原先“键（Key）”已经存在则替换“值value”，并返回原先的值。
-          在put(K key, V value)方法的末尾调用了fixAfterInsertion(Entry<K, V> x)方法，这个方法负责在插入结点后调整树结构和着色，以满足红黑树的要求。
-              1.每个结点或者是红色，或者是黑色
-              2.根是黑色的
-              3.如果一个结点是红色的，那么它的子节点必须是黑色的
-              4.一个结点到一个null引用的每一条路径必须包含相同数量的黑色结点。
-          注意，红黑树不是严格的平衡二叉树，它并不严格的保证左右子树的高度差不超过1，但红黑树高度依然是平均log(n)，
-            且最坏情况高度不会超过2log(n),所以它算是平衡树。
+                在put(K key, V value)方法的末尾调用了fixAfterInsertion(Entry<K, V> x)方法，这个方法负责在插入结点后调整树结构和着色，以满足红黑树的要求。
+                    1.每个结点或者是红色，或者是黑色
+                    2.根是黑色的
+                    3.如果一个结点是红色的，那么它的子节点必须是黑色的
+                    4.一个结点到一个null引用的每一条路径必须包含相同数量的黑色结点。
+                注意，红黑树不是严格的平衡二叉树，它并不严格的保证左右子树的高度差不超过1，但红黑树高度依然是平均log(n)，
+                  且最坏情况高度不会超过2log(n),所以它算是平衡树。
+                  fixAfterInsertion(Entry<K, V> x)方法涉及到了左旋和右旋操作
+                  
+          TreeMap中的get(Object key)通过Key获取对应的value，它通过调用getEntry(Object key)获取结点，
+              若结点为null则返回null，否则返回结点的value值。
+              getEntry函数主要是处理实现了可比较接口的情况，而有比较器的情况则是调用了getEntryUsingComparator(Object key).
+              
+          
+        
               
           
           
