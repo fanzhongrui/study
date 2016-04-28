@@ -1,0 +1,6 @@
+  TreeMap有Values、EntrySet、KeySet、PrivateEntryIterator、EntryIterator、ValueIterator、
+    KeyIterator、DescendingKeyIterator、NavigableSubMap、AscendingSubMap、DescendingSubMap、SubMap、Entry共13个内部类。
+  Entry是在TreeMap中用于表示树的结点的内部类，在《TreeMap理解》中已经分析过。
+  
+    Values是一个集合类，实际上是一个代理，多数方法是调用TreeMap的方法。
+        Values的iterator()方法中返回了一个ValueIterator对象。PrivateEntryIterator是TreeMap中和迭代器相关的类的基础。
