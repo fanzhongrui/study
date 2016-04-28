@@ -1,1 +1,55 @@
 TreeMap源码分析——基础分析
+
+  常见的数据结构有数组、链表、树。集合类中有基于数组的ArrayList，基于链表的LinkedList，还有链表和数组结合的HashMap。
+  Treemap基于红黑树实现。查看“键”或“键值对”时，他们会被排序（次序 由Comparable或Comparator决定）。
+  TreeMap的特点在于，所得到的结果是经过排序的。TreeMap是唯一的带有subMap()方法的Map，它可以返回一个子树。
+  
+  在介绍TreeMap前先介绍Comparable和Comparator接口。
+  Comparable接口：
+    public interface  Comparable<T>{
+        public int compareTo(T o);
+    }
+    Comparable接口支持泛型，只有一个方法，该方法返回负数、零、正数分别表示当前对象“小于”、“等于”、“大于”传入对象o。
+    Comparator接口：
+    public interface Comparator<T>{
+        int compare(T o1, T o2);
+        boolean equals(Object obj);
+    }
+      compare(T o1, T o2)方法比较o1和o2两个对象，o1“大于”o2,返回正数，相等返回零，“小于”返回负数。
+      equals(Object obj)返回true的唯一情况是obj也是一个比较器（Comparator）并且比较结果和此比较器的结果的大小次序是一致的。
+      即comp1.equals(comp2)意味着sgn(comp1.compare(o1, *o2))==sgn(comp2.compare(o1,o2))。
+      符号sgn(expression)表示数学上的sigmoid函数，该函数根据expression的值是负数、零或者正数，分别返回-1、0或1.
+      
+      小结一下，实现Comparable结构的类可以和其他对象进行比较，即实现Comparable可以进行比较的类。、
+      而实现Comparator接口的类是比较器，用于比较两个对象的大小。
+      
+    TreeMap
+        TreeMap类定义：
+          public class TreeMap<K, V> extends AbstractMap<K, V> implements NavigableMap<K, V>, Cloneable, java.io.Serializable
+          NavigableMap接口扩展的SortedMap，具有了针对给定搜索目标返回最接近匹配项的导航方法。
+          方法lowerEntry、floorEntry、ceilingEntry和higherEntry分别返回与小于、小于等于、大于等于、大于给定键的键关联的Map.Entry对象，如果不存在这样的键，则返回null。
+          类似地，方法lowerKey、floorKey、ceilingKey和higherKey只返回关联的键。
+          所有这些方法是为查找条目而不是遍历条目而设计的。
+          
+          TreeMap的属性有：
+            //用于保持顺序的比较器，如果为空，使用自然序保持Key的顺序
+            private final Comparator<? super K> comparator;
+            //根节点
+            private transient Entry<K,V> root = null;
+            //树中的结点数量
+            private transient int size = 0;
+            //多次在集合类中提到了，用于记录结构的改变次数
+            private transient int modCount = 0;
+            
+          TreeMap中的put()方法和其他Map的put（）方法一样，向Map中加入键值对，若原先“键（Key）”已经存在则替换“值value”，并返回原先的值。
+          在put(K key, V value)方法的末尾调用了fixAfterInsertion(Entry<K, V> x)方法，这个方法负责在插入结点后调整树结构和着色，以满足红黑树的要求。
+              1.每个结点或者是红色，或者是黑色
+              2.根是黑色的
+              3.如果一个结点是红色的，那么它的子节点必须是黑色的
+              4.一个结点到一个null引用的每一条路径必须包含相同数量的黑色结点。
+          注意，红黑树不是严格的平衡二叉树，它并不严格的保证左右子树的高度差不超过1，但红黑树高度依然是平均log(n)，
+            且最坏情况高度不会超过2log(n),所以它算是平衡树。
+              
+          
+          
+          
