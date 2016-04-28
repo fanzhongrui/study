@@ -63,7 +63,17 @@ TreeMap源码分析——基础分析
                   第三，t没有右孩子：沿着向上（向根节点方向）找到第一个自身是一个左孩子的结点或根节点，返回找到的结点
             与添加结点之后的修复类似，TreeMap删除结点后也需要进行类似的修复操作，通过这种修复来保证该排序二叉树依然满足红黑树特征。
                 删除之后的修复有fixAfterDeletion(Entry<K,V> x)方法提供。
-        
+                
+          clear()方法只是记录结构修改次数，将Size修改为0，将root设置为null，这样就没法通过root访问树的其他结点，所以树的内容会被GC回收。
+          
+          containsKey(Object  key)判断获取Key对应的结点是否为空，调用getEntry(Object key)方法获得Key对应的对象。
+          
+          containsValue(Object value)涉及到了getFirstEntry()方法和successor(Entry<K,V> e)方法。getFirstEntry()是获取第一个结点，
+              successor(Entry<K,V> e)是获取结点e的后继结点，在for循环中配合使用getFirstEntry()方法和successor(Entry<K,V> e)及e!=null是遍历树的一种方法。
+              getFirstEntry()实际上
+              
+          
+          
               
           
           
