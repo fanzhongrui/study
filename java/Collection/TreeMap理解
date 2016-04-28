@@ -55,7 +55,14 @@ TreeMap源码分析——基础分析
               若结点为null则返回null，否则返回结点的value值。
               getEntry函数主要是处理实现了可比较接口的情况，而有比较器的情况则是调用了getEntryUsingComparator(Object key).
               
-          
+          remove(Object key)只是获取要删除的结点并返回被删除结点的value。真正实现删除结点的内容是在deleteEntry(Entry e)中，设计到树结构的调整。
+            deleteEntry(Entry e)方法中主要有两个方法调用需要分析：successor(Entry<K,V> t)和fixAfterDeletion(Entry<K,V> x)。
+              successor(Entry<K,V> t)返回指定结点的后继结点。分三种情况处理，
+                  第一，t结点是个空结点：返回null；
+                  第二，t有右孩子：找到t的右孩子的最左子孙结点，如果右孩子没有左孩子则返回右结点，否则返回找到的最左子孙结点；
+                  第三，t没有右孩子：沿着向上（向根节点方向）找到第一个自身是一个左孩子的结点或根节点，返回找到的结点
+            与添加结点之后的修复类似，TreeMap删除结点后也需要进行类似的修复操作，通过这种修复来保证该排序二叉树依然满足红黑树特征。
+                删除之后的修复有fixAfterDeletion(Entry<K,V> x)方法提供。
         
               
           
