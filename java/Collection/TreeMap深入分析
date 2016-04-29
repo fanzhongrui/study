@@ -4,3 +4,14 @@
   
     Values是一个集合类，实际上是一个代理，多数方法是调用TreeMap的方法。
         Values的iterator()方法中返回了一个ValueIterator对象。PrivateEntryIterator是TreeMap中和迭代器相关的类的基础。
+    PrivateEntryIterator类的prevEntry()方法用到了predecessor(Entry<K,V> t)方法。
+    predecessor(Entry<K, V> t)方法返回传入结点的前一个结点，具体结点和树的遍历次序相关。
+    根据successor(Entry<K,V> t)和predecessor(Entry<K,V> t)方法可以推出TreeMap中树的遍历次序是中根遍历（左孩子-根-右孩子）。
+    
+    和迭代器相关的内部类：
+      EntryIterator是树结点的迭代器，和PrivateEntryIterator一样，因为提供的方法都是直接调用负父类的方法。
+    
+    TreeMap还有两个和Set相关的内部类，分别是 EntrySet和KeySet。两个类分别表示节点的集合和键的集合。
+    
+    还有四个和SubMap相关的内部类：NavigableSubMap、AscendingSubMap、DescendingSubMap、SubMap
+        NavigableSubMap是一个抽象类，继承了AbstractMap,实现了NavigableMap接口
