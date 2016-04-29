@@ -1,0 +1,5 @@
+两个线程需要同时访问一个中间临界区（Queue），比如常会用缓存作为外部文件的副本（HashMap）。
+三种并发集合类型有concurrent，copyonright，queue。
+本文介绍ConcurrentHashMap。
+
+通过分析Hashtable知道，synchronized是针对整张Hash表的，即每次锁住整张表让线程独占，
