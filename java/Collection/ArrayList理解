@@ -1,0 +1,5 @@
+  ArrayList定义：
+      public class ArrayList<E> extends AbstractList<E>  implements List<E>, RandomAccess, Cloneable, java.io.Serializable
+  
+  从ArrayList<E>看出它是支持泛型的，它继承自AbstractList，实现了List，RandomAccess、Cloneable、java.io.Serializable接口
+  
