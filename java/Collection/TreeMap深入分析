@@ -15,3 +15,4 @@
     
     还有四个和SubMap相关的内部类：NavigableSubMap、AscendingSubMap、DescendingSubMap、SubMap
         NavigableSubMap是一个抽象类，继承了AbstractMap,实现了NavigableMap接口
+        SubMap继承自AbstractMap，这个类存在仅仅为了序列化兼容之前的版本不支持的NavigableMap TreeMap.它被翻译成一个旧版本AscendingSubMap子映射到的一个新版本。
