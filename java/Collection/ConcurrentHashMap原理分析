@@ -48,3 +48,12 @@ ConcurrentHashMap内部使用段（Segment）来表示这些不同的部分，�
   
 其它
     为了加快定位段以及段中hash槽的速度，每个段hash槽的个数都是2^n,这使得通过位运算就可以定位段和段中hash槽的位置。
+    当并发级别为默认值16时，即段的个数，hash值的高4位决定分配在哪个段中。
+    注意：hash槽的个数不应该是2^n，这可能导致hash槽分配不均，这需要对hash值重新再hash一次。
+      定位段的方法：
+      final Segment<K,V> segmentFor(int hash){
+          return segments[(hash >>> segmentShift) & segmentMask];
+      }
+    
+  数据结构
+      Hash表的一个很重要方面就是如何解决hash冲突，ConcurrentHashMap和HashMap使用相同的方式，都是将hash值相同的节点放在一个hash链中。
