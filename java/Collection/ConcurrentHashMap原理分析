@@ -56,4 +56,11 @@ ConcurrentHashMap内部使用段（Segment）来表示这些不同的部分，�
       }
     
   数据结构
-      Hash表的一个很重要方面就是如何解决hash冲突，ConcurrentHashMap和HashMap使用相同的方式，都是将hash值相同的节点放在一个hash链中。
+      Hash表的一个很重要方面就是如何解决hash冲突，ConcurrentHashMap和HashMap使用相同的方式，，都是将hash值相同的节点放在一个hash链中。
+      与HashMap不同的是，ConcurrentHashMap使用多个子Hash表，也就是段（Segment）。
+      ConcurrentHashMap的数据成员：
+        public class ConcurrentHashMap<K,V> extends AbstractMap{
+        
+        }
+      所有的成员都是final的，其中segmentMask和segmentShift主要是为了定位段，参见segmentFor方法。
+      每个Segment相当于一个子Hash表，
