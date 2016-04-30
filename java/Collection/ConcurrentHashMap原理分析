@@ -87,4 +87,11 @@ ConcurrentHashMap内部使用段（Segment）来表示这些不同的部分，�
       这利用了java 5中对volatile语义的增强，对同一个volatile变量的写和读存在happens－before关系。
       modCount统计段结构改变的次数，主要是为了检测对多个段进行遍历过程中某个段是否发生改变。
       
+      threshold用来表示需要进行rehash的界限值。
+      table数组存储段中节点，每个数组元素是个hash链，用HashEntry表示。
+      table也是volatile，这使得能够读取到最新的table值而不需要同步。
+      
+      
+      
+      
       
