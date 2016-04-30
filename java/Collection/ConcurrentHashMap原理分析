@@ -90,6 +90,7 @@ ConcurrentHashMap内部使用段（Segment）来表示这些不同的部分，�
       threshold用来表示需要进行rehash的界限值。
       table数组存储段中节点，每个数组元素是个hash链，用HashEntry表示。
       table也是volatile，这使得能够读取到最新的table值而不需要同步。
+      loadFactor表示负载因子。
       
       
       
