@@ -59,8 +59,32 @@ ConcurrentHashMap内部使用段（Segment）来表示这些不同的部分，�
       Hash表的一个很重要方面就是如何解决hash冲突，ConcurrentHashMap和HashMap使用相同的方式，，都是将hash值相同的节点放在一个hash链中。
       与HashMap不同的是，ConcurrentHashMap使用多个子Hash表，也就是段（Segment）。
       ConcurrentHashMap的数据成员：
-        public class ConcurrentHashMap<K,V> extends AbstractMap{
-        
+        public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
+            implements ConcurrentMap<K,V>,Serializable{
+            /*Mask value for indexing into segments.
+             *The upper bits of a key's hash code are used to choose the segment
+             */
+            final int segmentMask;
+            /*Shift value for indexing within segments.
+             */
+            final int segmentShift;
+             /*The segments, each of which is a specialized hash table
+             */
+            final Segment<K,V>[] segments;
         }
       所有的成员都是final的，其中segmentMask和segmentShift主要是为了定位段，参见segmentFor方法。
-      每个Segment相当于一个子Hash表，
+      每个Segment相当于一个子Hash表，它的数据成员如下：
+        static final class Segment<K,V> extends ReentrantLock implements Serializable{
+            private static final long serialVersionUID = 2249069246763182397L;  
+            transient volatile int count;
+            transient int modCount;
+            transient int threshold;
+            transient volatile HashEntry<K,V>[] table;
+            final float loadFactor;
+        }
+      count用来统计该段数据的个数，它是volatile，它用来协调修改和读取操作，以保证读取操作能够读取到几乎最新的修改。
+      协调方式如下：每次修改操作做了结构上的改变，如增加／删除节点（修改节点的值不算结构上的改变），都要写count值，每次读取操作开始都要读取count的值。
+      这利用了java 5中对volatile语义的增强，对同一个volatile变量的写和读存在happens－before关系。
+      modCount统计段结构改变的次数，主要是为了检测对多个段进行遍历过程中某个段是否发生改变。
+      
+      
