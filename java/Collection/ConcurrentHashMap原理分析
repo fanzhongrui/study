@@ -122,7 +122,7 @@ ConcurrentHashMap内部使用段（Segment）来表示这些不同的部分，�
           第二，remove执行的开始就将table赋给一个局部变量tab，因为table是volatile变量，读写volatile变量的开销很大。
               编译也不能对volatile变量的读写做任何优化，直接多次访问非volatile实例变量没有多大影响，编译器会做相应优化。
       
-      
+    同样，put操作也是委托给段的put方法。
       
       
       
