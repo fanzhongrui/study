@@ -92,6 +92,27 @@ ConcurrentHashMap内部使用段（Segment）来表示这些不同的部分，�
       table也是volatile，这使得能够读取到最新的table值而不需要同步。
       loadFactor表示负载因子。
       
+    删除
+      public V remove(Object key){
+          hash = hash(key.hashCode());
+          return segmentFor(hash).remove(key, hash, null);
+      }
+      整个操作是先定位到段，然后委托给段的remove操作。当多个删除操作并发进行时，只要它们所在的段不相同，它们就可以同时进行。
+      下面是segment的remove方法实现：
+      V remove(Object key, int hash, Object value){
+          lock();
+          try{
+              int c = count - 1;
+              HashEntry<K,V>[] tab = table;
+      
+      
+      
+      
+      
+      
+      
+      
+      
       
       
       
