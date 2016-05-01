@@ -108,7 +108,11 @@ ConcurrentHashMap内部使用段（Segment）来表示这些不同的部分，�
               HashEntry<K,V> first = tab[index];
               HashEntry<K,V> e = first;
               
-      
+      }
+      整个操作是在持有段锁的情况下执行的，空白行之前的行主要是定位到要删除的节点e。
+      然后，如果不存在这个节点就直接返回null，否则就要将e前面的节点复制一遍，尾节点指向e的下一个节点。
+      e后面的节点不需要复制，它们可以重用。
+      从代码来看，中间那个for循环是将定位之后的所有entry克隆并拼回前面去。
       
       
       
