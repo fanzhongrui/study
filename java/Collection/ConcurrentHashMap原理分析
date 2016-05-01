@@ -104,6 +104,10 @@ ConcurrentHashMap内部使用段（Segment）来表示这些不同的部分，�
           try{
               int c = count - 1;
               HashEntry<K,V>[] tab = table;
+              int index = hash & (tab.length - 1);
+              HashEntry<K,V> first = tab[index];
+              HashEntry<K,V> e = first;
+              
       
       
       
