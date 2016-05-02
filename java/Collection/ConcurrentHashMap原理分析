@@ -134,6 +134,7 @@ ConcurrentHashMap内部使用段（Segment）来表示这些不同的部分，�
     其中int index = hash & (tab.length - 1)，原来segment里面才是真正的hashtable，即每个segment是一个传统意义上的hashtable，
       这个语句就是找出需要的entry在table的那个位置，之后得到的entry就是这个链的第一个节点，如果e！＝null，说明找到了，这是将要替换节点的值（onlyIfAbsent＝＝false），
         否则，需要new一个entry，它的后继是first，而让tab[index]指向它，实际上就是将这个新entry插入到链头。
+        修改操作还有putAll和replace。putAll方法就是多次调用put方法。replace甚至不用做结构上的改变
       
       
       
