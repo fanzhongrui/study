@@ -130,7 +130,9 @@ ConcurrentHashMap内部使用段（Segment）来表示这些不同的部分，�
       必须得有个判断是否超限得语句以确保容量不足时能够rehash。
     接着找是否存在同样一个key的节点，如果存在就直接替换这个节点的值。
     否则创建一个新的节点并添加到hash链的头部，这时一定要修改modCount和count的值，同样修改count的值一定要放在最后一步。
-    put
+    put方法调用了rehash方法，rehash方法实现的也很精巧，主要利用了table的大小2^n。
+    其中int index = hash & (tab.length - 1)，原来segment里面才是真正的hashtable，即每个segment是一个传统意义上的hashtable，
+      这个语句就是找出需要的entry在table的那个位置，
       
       
       
