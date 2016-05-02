@@ -138,6 +138,15 @@ ConcurrentHashMap内部使用段（Segment）来表示这些不同的部分，�
     
     获取操作
       ConcurrentHashMap的get操作也是直接委托给Segment的get方法，直接看Segment的get方法：
+        V get(Object key, int hash){
+            if(count != 0){
+            
+            }
+        }
+      get操作不需要锁。第一步是访问count变量，这是一个volatile变量，由于所有的修改操作在进行结构修改时都会在最后一步写count变量，
+        通过这种机制保证get操作能够得到几乎最新的结构更新。
+      对于非结构更新，也就是节点值的改变，由于HashEntry的value变量是volatile的，也能保证读取到最新的值。
+        
       
       
       
