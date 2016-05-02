@@ -146,6 +146,9 @@ ConcurrentHashMap内部使用段（Segment）来表示这些不同的部分，�
       get操作不需要锁。第一步是访问count变量，这是一个volatile变量，由于所有的修改操作在进行结构修改时都会在最后一步写count变量，
         通过这种机制保证get操作能够得到几乎最新的结构更新。
       对于非结构更新，也就是节点值的改变，由于HashEntry的value变量是volatile的，也能保证读取到最新的值。
+      接下来就是根据hash和key对hash链进行遍历找到要获取的节点，如果没有找到，直接返回null。
+      对hash链进行遍历不需要加锁的原因在于链指针next是final的。但是头指针却不是final的，而是通过getFirst(hash)方法返回，
+        也就是存在table数组中的值。
         
       
       
