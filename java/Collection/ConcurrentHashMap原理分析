@@ -122,7 +122,13 @@ ConcurrentHashMap内部使用段（Segment）来表示这些不同的部分，�
           第二，remove执行的开始就将table赋给一个局部变量tab，因为table是volatile变量，读写volatile变量的开销很大。
               编译也不能对volatile变量的读写做任何优化，直接多次访问非volatile实例变量没有多大影响，编译器会做相应优化。
       
-    同样，put操作也是委托给段的put方法。
+    同样，put操作也是委托给段的put方法。put方法如下：
+      V put(K key, int hash, V value, boolean onlyIfAbsent){
+      
+      }
+    该方法也是在持有段锁（锁定整个segment）的情况下执行的，这也是为了并发的安全，修改数据是不能并发进行的，
+      必须得有个判断是否超限得语句以确保容量不足时能够rehash。
+    接着
       
       
       
