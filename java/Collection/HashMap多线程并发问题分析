@@ -1,0 +1,8 @@
+多线程put后可能导致get死循环
+    Java的文档中说，HashMap是非线程安全的，应该用ConcurrentHashMap。
+    当HashMap被多个线程操作时，会出现程序进入HashMap.get()后进入死循环，导致CPU利用率过高。
+    
+    产生这个死循环的根源在于对一个未保护的共享变量————一个“HashMap”数据结构的操作。
+    当所有操作的方法上加了“synchronized”后，一切恢复了正常。
+    问题原因是HashMap是非线程安全的，多个线程put的时候造成了某个key值Entry key list的死循环。
+    当另外一个线程get这个Entry List死循环的key的时候，这个get也会一直执行。
