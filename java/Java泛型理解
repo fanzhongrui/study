@@ -1,0 +1,68 @@
+一、Java泛型引入
+    java泛型的应用可以提高的代码的复用性，同时泛型提供了类型检查，减少了数据的类型转换，同时保证了类型安全。
+    泛型如何保证类型安全：
+      List list = new ArrayList();
+      list.add("abc");
+      list.add(new Integer(1));	//可以通过编译
+      for (Object object : list) {
+      	System.out.println((String)object);//抛出ClassCastException异常
+      }
+    上面的代码会在运行时抛出ClassCastException，因为它尝试将一个Integer转换为String。
+    而从java5开始，Collection的用法：
+      List<String> list = new ArrayList<>();
+      list.add("abc");
+      //list.add(new Integer(1));	//编译错误
+      for (String string : list) {
+      	System.out.println(string);//无需任何强制类型转换
+      }
+    List的创建增加了类型参数String，因此只能向list添加String类型对象，添加其他对象会抛出编译异常；
+    foreach循环不需要再添加任何强制类型转换，也就移除了运行时的ClassCastException异常。
+    
+二、泛型的类与接口
+    使用泛型定义自己的类与接口。
+      public class Gen {
+      	private Object obj;
+      	
+      	public Object getObj() {
+      		return obj;
+      	}
+      
+      	public void setObj(Object obj) {
+      		this.obj = obj;
+      	}
+      	
+      	public static void main(String[] args) {
+      		Gen gen = new Gen();
+      		gen.setObj("abc");
+      		String str = (String) gen.getObj();//类型转换，可能会引起运行时ClassCastException
+      	}
+      }
+      使用泛型来重新定义Gen————使用<>指定泛型参数。
+      public class Gen<T> {
+        	T obj;
+        
+        	public T getObj() {
+        		return obj;
+        	}
+        
+        	public void setObj(T obj) {
+        		this.obj = obj;
+        	}
+        	public static void main(String[] args) {
+        		Gen<String> gen = new Gen<>();
+        		gen.setObj("abc");
+        //		gen.setObj(10);		//无法通过编译
+        		String str = gen.getObj();	//无需类型转换
+        		//-----------------------------
+        		Gen gen2 = new Gen();//raw type原始类型
+        		gen2.setObj("abc");
+        		gen2.setObj(10);	//可以通过编译，自动装箱将10转化为Integer对象
+        		Integer num = (Integer) gen2.getObj();//使用了强制类型转换
+        	}
+        }
+
+
+
+
+
+
