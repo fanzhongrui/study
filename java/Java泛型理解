@@ -60,6 +60,144 @@
         		Integer num = (Integer) gen2.getObj();//使用了强制类型转换
         	}
         }
+        main()方法中使用的是泛型类型Gen<String>，不再需要强制类型转换，也就移除了运行时的ClassCastException。
+        也定义了一个没有使用泛型类型的gen2，编译器会警告“Gen is a raw type,References to generic type Gen<T> should be parameterized”。
+        当不提供泛型类型时，会默认使用Object代替，所以，gen2可以设置String和Integer类型，不过，应该尽量避免这种情况出现，如此，又需要用到强制类型转换，也伴随着运行时的ClassCastException异常。
+        
+        可以使用@SuppresWarings("rawtypes")来抑制编译器弹出警告。
+        
+        接口的泛型应用和类的泛型应用很类似，如下：
+        public interface List <E> {
+        	 void add(E x);
+        	 Iterator<E> iterator();
+        }
+        
+        public interface Iterator<E> {
+        	 E next();
+        	 boolean hasNext();
+        }
+        也可以将此应用到自定义的接口与类当中。还可以使用多个泛型参数来定义接口与类，比如Map<K,V>.
+        泛型类型也可以作为一个参数来用，如：new HashMap<String, List<String>>()。
+        
+三、泛型的命名规范
+        为了与Java关键字区别开，Java泛型参数只是使用一个大写字母来定义。各种常用泛型参数的意义如下：
+        E——Element，常用在Java Collection里，如：List<E>,Iterator<E>,Set<E>
+        K,V——Key，value，代表Map的键值对
+        N——Number，数字
+        T——Type，类型，如String，Integer等
+        S，U，V——2nd,3rd,4th类型，和T的用法一样
+        
+四、泛型的方法与构造函数
+    如果不希望整个类都被泛型化，可以只在某个方法上应用泛型。还可以在构造函数上应用泛型。
+        public class GenMethod {
+            	public static <T> void fromArrayToCollection(T[] a,Collection<T> c){
+            		for (T t : a) {
+            		  c.add(t);
+            		}
+            	}
+            	
+            	public static void main(String[] args) {
+            		Object[] oa = new Object[100];
+            		Collection<Object> co = new ArrayList<>();
+            		
+            		GenMethod.<Object>fromArrayToCollection(oa, co);
+            	}		
+            }
+    定义方法所用的泛型参数需要在修饰符之后添加，如public static <T>，如果有多个泛型参数，可如此定义<K,V>或者<T1,T2>
+    不建议在泛型变量里添加其他类型，如下会引起编译错误（或隐含错误）：
+        public static <T> void fromArrayToCollection(T[] a,Collection<T> c){
+    		for (T t : a) {
+    			c.add(t);
+    			c.add(new Object());	
+    		}
+    	}
+    泛型方法的调用GenMethod.<Object>fromArrayToCollection(oa, co); 在方法前声明了泛型类型Object。
+    因为编译器可以推断这个泛型类型，因此也可以这样写： GenMethod.fromArrayToCollection(oa, co)。
+    也可以如下：
+        String[] sa = new String[100];
+        Collection<String> cs = new ArrayList<String>();
+        
+        // T 推断为String
+        fromArrayToCollection(sa, cs);
+        
+        // T 推断为Object
+        fromArrayToCollection(sa, co);
+        
+        Integer[] ia = new Integer[100];
+        Float[] fa = new Float[100];
+        Number[] na = new Number[100];
+        Collection<Number> cn = new ArrayList<Number>();
+        
+        //T 推断为Number
+        fromArrayToCollection(ia, cn);
+        
+        //T 推断为Number
+        fromArrayToCollection(fa, cn);
+        
+        //T 推断为Number
+        fromArrayToCollection(na, cn);
+        
+        //T 推断为Object
+        fromArrayToCollection(na, co);
+        
+        //编译错误，Number与String不能兼容
+        fromArrayToCollection(na, cs);
+        
+五、泛型参数的界限
+        如果希望泛型类型只能是一部分类型，比如操作数据的时候，会希望是Number或其子类类型，
+            这其实就是给泛型参数添加一个界限。其定义形式为：
+            <T extends BoundingType>
+        此定义表示T应该是BoundingType的子类型（subtype）。T和BoundingType可以是类，也可以是接口。
+        而且，此处的“extends”表示的是子类型，不等同于继承。如：
+            public class Box<T> {
+            	private T t;
+            
+            	public void set(T t) {
+            		this.t = t;
+            	}
+            
+            	public T get() {
+            		return t;
+            	}
+            
+            	public <U extends Number> void inspect(U u) {
+            		System.out.println("T: " + t.getClass().getName());
+            		System.out.println("U: " + u.getClass().getName());
+            	}
+            
+            	public static void main(String[] args) {
+            		Box<String> integerBox = new Box<>();
+            		integerBox.set("abc");	//能通过编译，因为T指定为String类型
+            //		integerBox.inspect("abc");//不能通过编译，因为U必须是Number类型或其子类
+            		integerBox.inspect(new Integer(10));
+            	}
+            }
+            限定了泛型参数的界限，也可以调用BoundingType（如Number）的相对应的方法，如下：
+                public class NumberTest<T extends Integer> {
+                	private T num;
+                	
+                	public NumberTest(T num) { this.num = num;}
+                	
+                	public boolean isOdd(){
+                		return num.intValue()%2 == 1;
+                	}
+                	
+                	//....
+                }
+            如何为泛型参数添加多个限制范围，多重限制范围格式如下：
+                <T extends A & B & C>
+            一个泛型参数可以有多重限制范围，使用“&”分隔。且限制范围中至多有一个类。
+
+
+
+
+
+
+
+
+
+
+
 
 
 
