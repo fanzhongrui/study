@@ -184,9 +184,83 @@
                 	
                 	//....
                 }
+                
             如何为泛型参数添加多个限制范围，多重限制范围格式如下：
                 <T extends A & B & C>
             一个泛型参数可以有多重限制范围，使用“&”分隔。且限制范围中至多有一个类。
+            如果用一个类作为限定，它必须是限定列表中的第一个。如：
+                Class A { /* ... */ }
+                interface B { /* ... */ }
+                interface C { /* ... */ }
+                class D <T extends A & B & C> { /* ... */ }
+            如果BoundingType不是放在第一位，会产生编译异常：
+                class D <T extends B & A & C> { /* ... */ }  // 无法通过编译
+                
+    六、泛型方法与泛参界限的综合
+            泛型方法是一个有用的工具，那泛参的界限就是这个工具的灵魂，为这个工具添加了一些“行为准则”。
+            如下：设计一个方法，统计在一个数组里比指定元素大的个数，
+                public static <T> int countGreater(T[] array,T elem) {
+            		int count = 0;
+            		for (T t : array) {
+            			if (t > elem) {//编译错误
+            				++count;
+            			}
+            		}
+            		return  count;
+            	}
+            上面这个方法无法通过编译，因为操作符“>”只可以用在基本数据类型（byte,char,short,int,float,long,double,boolean）,
+            不可以用来比较对象之间的大小（除非实现了Comparable接口）。
+            所以要为<T>添加一个界限Comparable<T>:
+                public interface Comparable<T> {
+                    public int compareTo(T o);
+                }
+            更改后的代码如下：
+                public static <T extends Comparable<T>> int countGreater(T[] array,T elem) {
+            		int count = 0;
+            		for (T t : array) {
+            			if (t.compareTo(elem) > 0) {//无编译错误
+            				++count;
+            			}
+            		}
+            		return  count;
+            	}
+        	也可以选择添加界限Comparator<T,T>，只不过此界限需要两个参数。
+        	
+七、泛型、继承与子类型
+        如果两个类之间相互兼容（继承与被继承），那么便可以将一个类对象赋值给另一个对象，
+        比如：可以将一个String对象赋值给Object，String是Object的子类，
+            String someString = new String();
+            Object someObject = new Object();
+            someObject = someString;
+        在面向对象中，这是一种“is-a”关系。String是Object的一种对象，所以上面的赋值是可以的。
+        这种“is-a”关系，同样也适用泛型。如果将泛参设置Number，那么在随后的调用里，只需要传入一个数据对象就行了，如下：
+            Box<Number> box = new Box<>();
+            box.add(new Integer(1));   
+            box.add(new Double(1.0));
+        
+        但是对于这种方法：public void someMethod(Box<Number> n) { /*.....*/}
+        可以接受Box<Number>类型的参数，但是不能接受Box<Integer>或者Box<Double>类型的参数。
+        因为Box<Integer>和Box<Double>都不是Box<Number>的子类。
+        Integer是Number的子类，Box<Integer>和Box<Double>的共同父类是Object，但是它俩之间不是子类关系。
+        即，无论类A与类B是否存在关联，myClass<A>和myClass<B>都没有任何关联，其共同的父类是Object。
+        
+八、泛型类与子类型
+         泛型的extends与继承的extends不同，泛型的extends其后可以是一个类，也可以是一个接口。
+         泛型的extends代表子类型，而不是子类，或许可以把其等同于extends（继承）和implement的并集。
+         
+         泛型里，也存在子类型，前提是其泛型参数的限制没有改变，可以认为泛参没有改变，其实就是从原来的类或接口来判断泛型的子类型。
+         例如：ArrayList<E> implement List<E>，而List<E> extends  Collection<E>
+         那么，ArrayList<String>就是List<String>的子类型，而List<String>则是Collection<String>的子类型。
+         
+         假设需要定义自己的List接口——PayLoadList，其定义如下：
+            interface PayloadList<E,P> extends List<E> {
+              void setPayload(int index, P val);
+              //...
+            }
+        则这几种都是List<String>的子类型：
+            PayloadList<String,String>
+            PayloadList<String,Integer>
+            PayloadList<String,Exception>
 
 
 
