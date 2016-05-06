@@ -1,0 +1,94 @@
+  Java虚拟机载入Java类的步骤：
+    Java文件经过编译器编译后变成字节码文件（.class文件），
+    类加载器（ClassLoader）读取.class文件，并且转换成java.lang.Class的一个实例，
+    最后通过newInstance方法创建该类的一个对象。
+    ClassLoader的作用就是根据一个类名，找到对应的字节码，根据这些字节码定义出对应的类，
+    该类就是java.lang.Class的一个实例。
+    
+  类加载器的组织结构
+      Java有三个初始类加载器，当Java虚拟机启动时，它们会按照以下顺序启动：
+          Bootstrap classloader  ——》extension classloader  ————》system classloader
+      三者的关系：
+          bootstrap classloader是extension classloader的parent，
+          extension classloader是system classloader的parent。
+          
+    bootstrap classloader
+      它是最原始的类加载器，并不是由Java代码写的，是由原生代码编写的。
+      Java有一次编译、所有平台运行的效果，就是因为它写了一份功能相同，但针对不同平台不同语言实现的底层代码。
+      它负责加载Java核心库。
+      可以运行以下代码，看看自己本地的Java核心库位置：
+      URL[] urls = sun.misc.Launcher.getBootstrapClassPath().getURLs();
+      for( int i = 0; i < urls.length; i++){
+          System.out.println(urls[i].toExternalForm());
+      }
+
+    extension classloader
+        它用来加载JRE的扩展目录（ JAVA_HOME/jre/lib/ext或者java.ext.dirs系统属性指定的）JAR的类包。
+        因为它是bootstrap classloader加载的，所以，当运行：
+        ClassLoader extensionClassloader = ClassLoader.getSystemClassLoader.getParent();
+        System.out.println("the parent of extension classloader:"+ extensionClassloader.getParent());
+        
+      输出的是：the parent of extension classloader：null
+      
+    System classloader
+        它用于加载classpath目录下的jar包，我们写的Java类，一般都是由它加载，除非自己制定个人的类加载器。
+        
+  全盘负责委托机制
+      classloader加载类时，使用全盘负责委托机制，可以分开两部分理解：全盘负责，委托
+      
+      全盘负责机制 ：若类A调用了类B，则类B和类B所引入的所有jar包，都由类A的类加载器统一加载。
+      
+      委托机制：类加载器在加载类A时，会优先让父加载器加载，
+      当父加载器加载不到，再找父父加载器，一直找到bootstrap classloader，才自己去相关的路径去寻找加载。
+      以下是ClassLoader的源码：
+      protected synchronized Class<?> loadClass(String name, boolean resolve)
+          throws ClassNotFoundException {
+          //first, check if the class has already been loaded
+          Class c = findLoadedClass(name);
+          if(c == null) {
+              try {
+                  if( parent != null ){
+                      //从父加载器加载
+                      c = parent.loadClass(name, false);
+                  } else {
+                      //从bootstrap loader加载
+                      c = findBootstrapClassOrNull(name);
+                  }
+              } catch ( ClassNotFoundException e ) {
+                  //ClassNotFoundException thrown if class not found
+                  //from the non-null parent class loader
+              }
+              if (c == null) {
+                  //if still not found, then invoke findClass in order
+                  //to find the class
+                  c = findClass(name);
+              }
+          }
+          if (resolve) {
+              resolvClass(c);
+          }
+          return c;
+      }
+      
+  举例说明，类加载器加载类A的过程：
+    1.判断是否已经加载过，在cache里面查找，若有，跳7；否则下一步
+    2.判断当前加载器是否有父加载器，若无，则当前为ext classloader，跳去4，否则，下一步
+    3.请求父加载器加载该类，若加载成功，跳7；若不成功，即父加载器不能找到该类，跳2
+    4.请求JVM的bootstrap classloader加载，若加载成功，跳7；若失败，跳5
+    5.当前加载器自己加载，若成功，跳7；否则，跳6
+    6.抛出ClassNotFoundException
+    7.返回Class
+    
+  编写自己的类加载器
+      Java加载类的过程，实质上是调用loadClass()方法，
+      loadClass（）中调用findLoadedClass()方法来检查该类是否已经被加载过，
+      如果没有就会调用父加载器的loadClass（），如果父加载器无法加载该类，就调用findClass()来查找该类。
+      
+      所以需要新建MyClassLoader继承java.lang.ClassLoader，重写其中的findClass()方法。
+      主要是重新设计查找字节码文件的方案，然后调用definedClass来返回。
+                      
+                      
+                      
+                      
+                      
+      
