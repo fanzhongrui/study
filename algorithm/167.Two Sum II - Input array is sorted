@@ -1,0 +1,18 @@
+public class Solution{
+//167.Two Sum II-Input array is sorted
+	public List<Integer> twoSum2(int[] nums, int target){
+		List<Integer> res = new ArrayList<Integer>();
+		int st=0, ed=nums.length-1;
+		while(st<ed){
+			int x = nums[st]+nums[ed];
+			if(x<target)st++;
+			else if(x>target)ed--;
+			else{
+				res.add(st+1);
+				res.add(ed+1);
+				return res;
+			}
+		}
+		return res;
+	}
+	}

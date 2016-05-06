@@ -1,0 +1,20 @@
+//259.3Sum Smaller
+public class Solution{
+	public int threeSumSmaller(int[] nums, int target){
+		if(nums==null || nums.length==0)return 0;
+		int cnt = 0;
+		Arrays.sort(nums);
+		for(int i=0; i<nums.length; i++){
+			int k = target - nums[i];
+			int st = i+1, ed = nums.length-1;
+			while(st < ed){
+				int x = nums[st]+nums[ed];
+				if(x<k){
+					cnt += (ed-st);
+					break;
+				}else if(x>=k)ed--;
+			}
+		}
+		return cnt;
+	}
+}
