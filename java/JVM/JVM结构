@@ -53,5 +53,10 @@ classloader类加载器 ——————————》|			|	|			|
 	Perm区	|也叫本地方法区		|
 		________________________
 	
-	新创建的对象会分配到Young的Eden上，如果Eden满了
+	新创建的对象会分配到Young的Eden上，如果Eden满了就触发MinorGC，将Eden区中存活的对象保存到Survivor的一个区中，
+	同时将Survivor另一个区存活的对象也保存到Survivor这个区中，Survivor区始终有一个区是空的。
+	
+	Survivor的一个区满了之后，会将对象直接放到Old区，Old区满了会触发FullGC，将回收整个堆空间
+	
+	perm区主要保存class对象，垃圾回收也是FullGC触发
 	
