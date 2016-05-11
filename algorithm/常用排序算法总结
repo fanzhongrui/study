@@ -12,4 +12,29 @@
     依次进行，待整个序列中的记录基本上有序的时候，再对全体记录进行依次直接插入排序，
     此时增量减为1，因为直接插入排序在元素基本有序的情况下，效率是很高的。
     
-    希尔排序是稳定排序。希尔排序在按照增量分组后，其组内的排序可以使用插入排序，当然也可以使用冒泡排序、选择排序等等
+    希尔排序是不稳定排序。希尔排序在按照增量分组后，其组内的排序可以使用插入排序，当然也可以使用冒泡排序、选择排序等等
+        public static int ShellSort(int[] a){
+		int cnt = 0;
+		int h = 1;
+		while(h <= a.length/3)h = h*3+1;
+		while(h > 0){
+			for(int k=h; k<2*h; k++){
+				for(int i=k; i < a.length; i+=h){
+					if(a[i] < a[i-h]){
+						int tmp = a[i];
+						int j = i - h;
+						while(j >= 0 && tmp < a[j]){
+							cnt++;
+							a[j+h] = a[j];
+							j -= h;
+						}
+						a[j+h] = tmp;
+					}
+				}
+				System.out.print("cnt:");
+				print(a);
+			}
+			h = (h-1)/3;
+		}
+		return cnt;
+	}
