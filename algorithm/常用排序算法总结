@@ -53,3 +53,23 @@
 		第三步，判断stack1是否为空，如果为空，则进行第四步。如果不为空则重复第二步。
 		第四步，出栈stack中的数据，按照出栈数据的起始位置，终点位置和中间位置进行合并。
 		第五步，判断栈stack是否为空，如果不为空则重复第四步，如果为空则程序结束。
+	public static void MergeSort(int a[], int left, int right, int tmp[]){
+		if(left < right){
+			int m = left + (right - left)/2;
+			MergeSort(a,left,m,tmp);
+			MergeSort(a,m+1,right,tmp);
+			merge(a,left,m,right,tmp);
+		}
+	}
+	public static void merge(int a[], int left, int m, int right, int tmp[]){
+		int i=left, j=m+1, k=0;
+		while(i<=m && j<=right){
+			if(a[i]<=a[j])tmp[k++]=a[i++];
+			else tmp[k++]=a[j++];
+		}
+		while(i<=m)tmp[k++]=a[i++];
+		while(j<=right)tmp[k++]=a[j++];
+		i=left; 
+		j=0;
+		while(j<k)a[i++]=tmp[j++];
+	}
