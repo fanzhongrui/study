@@ -17,13 +17,13 @@ public class validParentheses {
 			case '{': stack.push(c);continue;
 			case '[': stack.push(c);continue;
 			case ')': 
-					if(stack.pop().equals('(')) continue ;
+					if( !stack.isEmpty() && stack.pop().equals('(')) continue ;
 					else return false;
 			case '}': 
-					if(stack.pop().equals('{')) continue ;
+					if(!stack.isEmpty() && stack.pop().equals('{')) continue ;
 					else return false;
 			case ']': 
-					if(stack.pop().equals('[')) continue ;
+					if(!stack.isEmpty() && stack.pop().equals('[')) continue ;
 					else return false;
 			default:return false;
 			}
