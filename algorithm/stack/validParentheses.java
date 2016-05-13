@@ -28,7 +28,7 @@ public class validParentheses {
 			default:return false;
 			}
 		}
-		return true;
+		return stack.isEmpty();
 	}
 	public static void main(String[] args){
 		String s1 = "((({{{[]}}})))";
