@@ -50,7 +50,72 @@ ReentrantLock类实现了Lock，它拥有与synchronized相同的并发性和内
 它还提供了在激烈争用情况下更佳的性能。即，当许多线程都想访问共享资源时，JVM可以花更少的时间来调度线程，把更多的时间用在执行线程上。  
 注意：用synchronized修饰的方法或者语句块在代码执行完之后锁自动释放，而Lock类需要手动释放，所以为了保证锁最终被释放（发生异常情况时），要把互斥区放在try内，释放锁放在finally内！  
 ####读写锁ReadWriteLock
+与互斥锁相比，读-写锁定允许对共享数据进行更高级别的并发访问。虽然一次只有一个线程（writer线程）可以修改共享数据，但在许多情况下，
+任何数量的线程可以同时读取共享数据（reader线程）  
+从理论上讲，与互斥锁相比，读-写锁所允许的并发性能增强将带来更大的性能提高。  
+只有在多处理器上并且只在访问模式适用于共享数据时，才能实现并发性增强。  
+————例如，某个最初用数据填充并且之后不经常对其进行修改的Collection，因为经常对其进行搜索（比如搜索某种目录），所以这样的Collection是使用读-写锁定的理想候选者。  
+####线程间通信Condition
+Condition可以替代传统的线程间通信，**用await()替换wait()，用signal()替换notify()，用signalAll()替换notifyAll()。**
+>为什么方法名不直接叫wait()/notify()/notifyAll()？因为Object的这几个方法是final的，不可重写！  
+传统线程的通信方式，Condition都可以实现。  
+Condition是被绑定到Lock上的，要创建一个Lock的Condition必须用newCondition()方法。  
+Condition的强大在于它可以为多个线程间建立不同的Condition。  
+>`package test.concurrent;
 
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+public class BoundedBuffer {
+	final Lock lock = new ReentrantLock();  //锁对象
+	final Condition notFull = lock.newCondition(); //写线程锁
+	final Condition notEmpty = lock.newCondition();//读线程锁
+	
+	final Object[] items = new Object[100];   //缓存队列
+	int putptr;									//写索引
+	int takeptr;							//读索引
+	int count;  							//队列中数据数目
+	//写
+	public void put(Object x)throws InterruptedException{
+		lock.lock();	//锁定
+		try{
+			//若队列已满，则将 写线程 放入阻塞队列
+			while(count == items.length){
+				notFull.await();
+			}
+			//写入队列，并更新写索引
+			items[putptr] = x;
+			if(++putptr == items.length)putptr=0;
+			++count;
+			//唤醒 读线程
+			notEmpty.signal();
+		}finally{
+			lock.unlock();//解除锁定
+		}
+	}
+	//读
+	public Object take() throws InterruptedException{
+		lock.lock();	//锁定
+		try{
+			//若队列为空，则将 读线程 放入阻塞队列
+			while(count == 0){
+				notEmpty.await();
+			}
+			//读取队列，并更新读索引
+			Object x = items[takeptr];
+			if(++takeptr == items.length)takeptr = 0;
+			--count;
+			//唤醒 写线程
+			notFull.signal();
+			return x;
+		}finally{
+			lock.unlock();//解除锁定
+		}
+	}
+}
+`
+其实就是java.util.concurrent.ArrayBlockingQueue
 
 
 
