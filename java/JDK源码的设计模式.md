@@ -34,4 +34,5 @@ binarySort(a, lo, hi, lo + initRunLen);
             ....
         }
     }
-    ```
+```
+####**1.2 InputStream.read()**
