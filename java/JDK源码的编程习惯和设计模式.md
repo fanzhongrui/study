@@ -1,8 +1,9 @@
 ###**编程习惯**
 ####**1.用工厂方法替代构造函数**
-**Boolean.valueOf()：**
+#####**1.1 Boolean.valueOf()：**
 通过一个boolean简单类型，构造Boolean对象引用  
->优点：无需每次被调用时都创建一个新对象。同时使得类可以严格控制在哪个时刻有哪些实例存在    
+>优点：无需每次被调用时都创建一个新对象。同时使得类可以严格控制在哪个时刻有哪些实例存在   
+
 ```java
 /**
  * Returns a <code>Boolean</code> with a value represented by the
@@ -19,9 +20,10 @@ public static Boolean valueOf(String s) {
 ```
 静态工厂方法Boolean.valueOf(String)几乎总是比构造函数Boolean(String)更可取。
 构造函数每次被调用时都会创建一个新对象，而静态工厂方法则从来不要求这样做，实际上也不会这么做。
-**BigInteger.probablePrime()**:
+##### **1.2 BigInteger.probablePrime()**:
 构造方法BigInteger(int, int, Random)返回一个可能为素数的BigInteger，而用一个名为BigInteger.probablePrime()的静态工厂方法会更好。
 >优点：方法名对客户端更友好  
+
 ```java
 public class BigInteger extends Number implements Comparable<BigInteger> {
    /**
@@ -39,12 +41,13 @@ public class BigInteger extends Number implements Comparable<BigInteger> {
                 largePrime(bitLength, DEFAULT_PRIME_CERTAINTY, rnd));
     }
 ```
-**EnumSet**:  
+#####**1.3 EnumSet**:  
 JDK1.5引入的`java.util.EnumSet`类没有public构造函数，只有静态工厂方法。  
 根据底层枚举类型的大小，这些工厂方法可以返回两种实现：  
--如果用于64个或更少的元素（大多数枚举类型都是这样），静态工厂方法返回一个`RegularEnumSet`实例，用单个long来支持；
--如果枚举类型拥有65个或更多的元素，静态工厂方法则返回`JumboEnumSet`实例，用`long数组`来支持。  
->优点：静态工厂方法能返回任意子类型的对象。可以根据参数的不同，而返回不同的类型。
+-如果用于64个或更少的元素（大多数枚举类型都是这样），静态工厂方法返回一个`RegularEnumSet`实例，用单个long来支持；  
+-如果枚举类型拥有65个或更多的元素，静态工厂方法则返回`JumboEnumSet`实例，用`long数组`来支持。    
+>优点：静态工厂方法能返回任意子类型的对象。可以根据参数的不同，而返回不同的类型。  
+
 ```java
 public abstract class EnumSet<E extends Enum<E>> extends AbstractSet<E>
     implements Cloneable, java.io.Serializable
@@ -66,19 +69,13 @@ public abstract class EnumSet<E extends Enum<E>> extends AbstractSet<E>
             return new JumboEnumSet<E>(elementType, universe);
     }
 }
-
 class RegularEnumSet<E extends Enum<E>> extends EnumSet<E> {
 }
-
 class JumboEnumSet<E extends Enum<E>> extends EnumSet<E> {
 }
  ```
-
-
-### Collections.unmodifiableMap(Map)
-
+#####**1.4 Collections.unmodifiableMap(Map)**  
 Java集合框架中有32个集合接口的便利实现，提供不可修改的集合、同步集合等等。几乎所有的实现都通过一个不可实例化类（`java.util.Collections`）中的静态工厂方法导出，返回对象的类都是非public的。
 
 > **优点：静态工厂方法能返回任意子类型的对象。可以返回一个对象而无需使相应的类public。用这种方式隐藏实现类能够产生一个非常紧凑的API**
 
-```
