@@ -77,5 +77,17 @@ class JumboEnumSet<E extends Enum<E>> extends EnumSet<E> {
 #####**1.4 Collections.unmodifiableMap(Map)**  
 Java集合框架中有32个集合接口的便利实现，提供不可修改的集合、同步集合等等。几乎所有的实现都通过一个不可实例化类（`java.util.Collections`）中的静态工厂方法导出，返回对象的类都是非public的。
 
-> 优点：**静态工厂方法能返回任意子类型的对象。可以返回一个对象而无需使相应的类public。用这种方式隐藏实现类能够产生一个非常紧凑的API**
-
+> 优点：**静态工厂方法能返回任意子类型的对象。可以返回一个对象而无需使相应的类public。用这种方式隐藏实现类能够产生一个非常紧凑的API**  
+```java
+public class Collections { 
+/* * Returns an unmodifiable view of the specified map. This method * allows modules to provide users with “read-only” access to internal * maps. Query operations on the returned map “read through” * to the specified map, and attempts to modify the returned * map, whether direct or via its collection views, result in an * UnsupportedOperationException.
+* / 
+public static <K,V> Map<K,V> unmodifiableMap(Map<? extends K, ? extends V> m) { return new UnmodifiableMap<K,V>(m); }
+private static class UnmodifiableMap<K,V> implements Map<K,V>, Serializable {
+  }
+```
+###2.**私有化构造函数，实现Singleton**
+####2.1**Arrays**  
+这种工具类设计出来并不是为了实例化它，然而，
+如果不显示地编写构造函数，编译器则会提供一个公共的无参数的默认构造方法。
+所以将构造函数私有化：
