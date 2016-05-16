@@ -113,8 +113,7 @@ public class BoundedBuffer {
 			lock.unlock();//解除锁定
 		}
 	}
-}
-`
+}  
 其实就是java.util.concurrent.ArrayBlockingQueue
 
 
