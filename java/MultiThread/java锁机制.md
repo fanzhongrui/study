@@ -57,7 +57,8 @@ ReentrantLock类实现了Lock，它拥有与synchronized相同的并发性和内
 ————例如，某个最初用数据填充并且之后不经常对其进行修改的Collection，因为经常对其进行搜索（比如搜索某种目录），所以这样的Collection是使用读-写锁定的理想候选者。  
 ####线程间通信Condition
 Condition可以替代传统的线程间通信，**用await()替换wait()，用signal()替换notify()，用signalAll()替换notifyAll()。**
->为什么方法名不直接叫wait()/notify()/notifyAll()？因为Object的这几个方法是final的，不可重写！  
+>为什么方法名不直接叫wait()/notify()/notifyAll()？因为Object的这几个方法是final的，不可重写！   
+
 传统线程的通信方式，Condition都可以实现。  
 Condition是被绑定到Lock上的，要创建一个Lock的Condition必须用newCondition()方法。  
 Condition的强大在于它可以为多个线程间建立不同的Condition。  
