@@ -30,7 +30,8 @@ public interface Enumeration<E> {
 ```
 
 ##**2. 模板方法模式(Template Method)**
-###**2.1 java.util.AbstractList, java.util.AbstractSet和java.util.AbstractMap的所有非抽象方法**  
+###**2.1 java.util.AbstractList的所有非抽象方法**  
+> 以及`java.util.AbstractSet`,`java.util.AbstractMap`的所有非抽象方法
 
 ```java
 package java.util;
