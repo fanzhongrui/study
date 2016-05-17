@@ -148,7 +148,10 @@ public abstract class AbstractList<E> extends AbstractCollection<E> implements L
 }
 ```
 
-###**2.2 Applet.init()/start()/stop()/destroy()/paint()——————模板方法模式(Template Method)**
+###**2.2 模板方法模式(Template Method)**
+
+>Applet.init()/start()/stop()/destroy()/paint()  
+
 Applet中的init()/start()/stop()/destroy()/paint()这些方法，都是hook  
 
 ```java
