@@ -1,7 +1,10 @@
 ##**1. Iterator迭代器————————迭代器与组合模式**
 ###**1.1 Collection.iterator()**
 集合（Collection）指的是一群对象，其存储方式可以是各式各样的数据结构。  
-如何能让客户遍历你的对象而又无法窥视你存储对象的方式——利用迭代器（iterator）来封装“遍历集合内的每个对象的过程”。
+如何能让客户遍历你的对象而又无法窥视你存储对象的方式——利用迭代器（iterator）`java.util.Iterator`来封装“遍历集合内的每个对象的过程”。
+
+###**1.2  java.util.Enumeration枚举类型**
+
 ##**1. Template Method**
 ###**1.1 Arrays.sort()**
 ```java
