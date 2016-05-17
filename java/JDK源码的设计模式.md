@@ -241,3 +241,119 @@ public static Integer valueOf(int i) {
         return new Integer(i);
     }
 ```
+
+###**3.2 java.lang.Class#forName()**
+```java
+ public static Class<?> forName(String className)
+                throws ClassNotFoundException {
+        return forName0(className, true,
+                        ClassLoader.getClassLoader(Reflection.getCallerClass()));
+    }
+/** Called after security checks have been made. */
+private static native Class<?> forName0(String name, boolean initialize, ClassLoader loader) throws ClassNotFoundException;
+    @CallerSensitive
+    public T newInstance() throws InstantiationException, IllegalAccessException
+    {
+        if (System.getSecurityManager() != null) {
+            checkMemberAccess(Member.PUBLIC, Reflection.getCallerClass(), false);
+        }
+        // NOTE: the following code may not be strictly correct under
+        // the current Java memory model.
+        // Constructor lookup
+        if (cachedConstructor == null) {
+            if (this == Class.class) {
+                throw new IllegalAccessException(
+                    "Can not call newInstance() on the Class for java.lang.Class"
+                );
+            }
+            try {
+                Class<?>[] empty = {};
+                final Constructor<T> c = getConstructor0(empty, Member.DECLARED);
+                // Disable accessibility checks on the constructor
+                // since we have to do the security check here anyway
+                // (the stack depth is wrong for the Constructor's
+                // security check to work)
+                java.security.AccessController.doPrivileged(
+                    new java.security.PrivilegedAction<Void>() {
+                        public Void run() {
+                                c.setAccessible(true);
+                                return null;
+                            }
+                        });
+                cachedConstructor = c;
+            } catch (NoSuchMethodException e) {
+                throw (InstantiationException)
+                    new InstantiationException(getName()).initCause(e);
+            }
+        }
+        Constructor<T> tmpConstructor = cachedConstructor;
+        // Security check (same as in java.lang.reflect.Constructor)
+        int modifiers = tmpConstructor.getModifiers();
+        if (!Reflection.quickCheckMemberAccess(this, modifiers)) {
+            Class<?> caller = Reflection.getCallerClass();
+            if (newInstanceCallerCache != caller) {
+                Reflection.ensureMemberAccess(caller, this, null, modifiers);
+                newInstanceCallerCache = caller;
+            }
+        }
+        // Run constructor
+        try {
+            return tmpConstructor.newInstance((Object[])null);
+        } catch (InvocationTargetException e) {
+            Unsafe.getUnsafe().throwException(e.getTargetException());
+            // Not reached
+            return null;
+        }
+    }
+```
+##**4. 适配器模式（Adapter）**
+###**4.1 java.util.Arrays#asList()**
+```java
+//Arrays
+ public static <T> List<T> asList(T... a) {
+        return new ArrayList<>(a);
+    }
+```
+
+###**4.2 RunnableAdapter**
+完整类名：`java.util.concurrent.Executors.RunnableAdapter<T>`
+`FutureTask`接受一个`Callable`参数，但是如果有的是`Runnable`该怎么办？
+`FutureTask`本身提供了适配：  
+
+```java
+/**
+ * Creates a <tt>FutureTask</tt> that will upon running, execute the given <tt>Callable</tt>.
+ */
+public FutureTask(Callable<V> callable) {
+    sync = new Sync(callable);
+}
+
+/**
+ * Creates a <tt>FutureTask</tt> that will upon running, execute the given <tt>Runnable</tt>
+ */
+public FutureTask(Runnable runnable, V result) {
+    sync = new Sync(Executors.callable(runnable, result));
+}
+```
+Executors.callable()返回Adapter对象：
+```java
+public static <T> Callable<T> callable(Runnable task, T result) {
+    return new RunnableAdapter<T>(task, result);
+}
+
+/** --Adapter!--
+ * A callable that runs given task and returns given result
+ */
+static final class RunnableAdapter<T> implements Callable<T> {  //Target
+    final Runnable task; //Adaptee
+    final T result;
+    RunnableAdapter(Runnable  task, T result) {
+        this.task = task;
+        this.result = result;
+    }
+    public T call() {
+        task.run();
+        return result;
+    }
+}
+```
