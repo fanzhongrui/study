@@ -91,7 +91,8 @@ System.out.println(thread.getName());
 ```java
 String threadName = Thread.currentThread().getName();
 ```  
-###线程代码举例**
+###**线程代码举例**  
+首先输出执行main()方法的线程名字。这个线程名是由JVM分配的。然后开启10个线程，命名为1~10。每个线程输出自己的名字后就退出。
 ```java
 public class ThreadExample {
   public static void main(String[] args){
