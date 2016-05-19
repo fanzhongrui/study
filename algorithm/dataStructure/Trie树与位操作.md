@@ -82,8 +82,12 @@ insert(root, num, level):
        else: insert(root->left, num, level-1)
  ```
  对于查询，只需递归遍历树。  
- 子问题：Given a group of n non-empty strings. During the game two players build the word together, initially the word is empty. The players move in turns. On his step player must add a single letter in the end of the word, the resulting word must be prefix of at least one string from the group. A player loses if he cannot move.  
+ >子问题：Given a group of n non-empty strings. During the game two players build the word together, initially the word is empty. The players move in turns. On his step player must add a single letter in the end of the word, the resulting word must be prefix of at least one string from the group. A player loses if he cannot move.    
+ 
  需要我们找到哪一个玩家（1/2）有必赢策略。  
  一个思路就是为所有的string构建一颗trie树，因为trie树存储了所有前缀信息。  
  对每个结点计算玩家1是否拥有必赢策略。这个计算可以递归实现。  
- 对于结点v，
+ 对于结点v，考虑结点v的每个孩子u，如果玩家1在结点u处有必输策略，那么玩家1在结点v就有一个必赢策略。
+ 比如，假设有“abc”,"abd","acd"，最终的trie树如下：  
+ ![]()   
+ 所有的叶结点都有必赢策略。
