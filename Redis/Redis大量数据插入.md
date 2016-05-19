@@ -23,21 +23,21 @@ errors: 0, replies: 1000000
 使用redis－cli将有效的确保错误输出到Redis实例的标准输出里面。  
 ####生成Redis协议
 它会非常简单的生成和解析Redis协议。但是为了生成大量数据插入的目标，就需要了解每一个细节协议，每个命令会用如下方式表示：  
-*<args><cr><lf>
+*`<args><cr><lf>
 &<len><cr><lf>
 <arg0><cr><lf>
 <arg1><cr><lf>
 ...
-<argN><cr><lf>
+<argN><cr><lf>`
 这里的<cr>是“\r”（或者是ASCII的13）、<lf>是“\n”（或者是ASCII的10）。
 例如，命令set key value协议格式如下：
-*3<cr><lf>  
+*`3<cr><lf>  
 $3<cr><lf>  
 set<cr><lf>  
 $3<cr><lf>  
 key<cr><lf>  
 $5<cr><lf>  
-value<cr><lf>  
+value<cr><lf>  `
 或表示为引用字符串：  
 “*3\r\n$3\r\nset\r\n$3\r\nkey\r\n$5\r\n$5\r\nvalue\r\n”  
 你需要将大量插入数据的命令按照上面的方式一个接一个的生成到文件。  
