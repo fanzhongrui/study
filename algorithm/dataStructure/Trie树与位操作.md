@@ -30,7 +30,8 @@ Trie树由一系列结点组成，每个结点存储一个字符/位。从而我
  
  查询操作的时间复杂度也为log2(MAX)  
  
- >**Problem2:**Given an array of integers, find the subarray with maximum XOR.  
+ >**Problem2:**Given an array of integers, find the subarray with maximum XOR.   
+ 
  **Solution:**  
  假设F(L,R)是从L到R的子数组的异或XOR值。  
  这里我们用到一个公式：F(L,R)=F(1,R) XOR F(1,L-1)。然后呢？  
@@ -47,6 +48,7 @@ Trie树由一系列结点组成，每个结点存储一个字符/位。从而我
  print ans
  ```  
  >**Problem3:**Given an array of positive integers you have to print the number of subarrays whose XOR is less than K.  
+ 
  **Solution:**  
  和前面两题类似。 
  对于从i=1到N的每一个下标，统计以i位置结尾的子数组中满足条件的子数组个数。
@@ -74,3 +76,14 @@ insert(root, num, level):
     x = level'th bit of num
     if x == 1:
        if root->right is NULL: create root->right
+       else: insert(root->right, num, level-1)
+    else :
+       if root->left is NULL: create root->left
+       else: insert(root->left, num, level-1)
+ ```
+ 对于查询，只需递归遍历树。  
+ 子问题：Given a group of n non-empty strings. During the game two players build the word together, initially the word is empty. The players move in turns. On his step player must add a single letter in the end of the word, the resulting word must be prefix of at least one string from the group. A player loses if he cannot move.  
+ 需要我们找到哪一个玩家（1/2）有必赢策略。  
+ 一个思路就是为所有的string构建一颗trie树，因为trie树存储了所有前缀信息。  
+ 对每个结点计算玩家1是否拥有必赢策略。这个计算可以递归实现。  
+ 对于结点v，
