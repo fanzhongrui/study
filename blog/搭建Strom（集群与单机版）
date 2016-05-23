@@ -8,7 +8,7 @@ storm旧版本中使用zeromq作为网络通信库，安装比较复杂，且仅
 解压安装包：tar -zxvf zookeeper-3.4.7.tar.gz
 将安装包复制到安装目录下：mv zookeeper-3.4.7 /usr/pro/zookeeper
 进入安装目录：cd /usr/pro/zookeeper/conf
-复制zoo-example.cfg为zoo.cfg：cp zoo_example.cfg zoo.cfg
+复制zoo-example.cfg为zoo.cfg：cp zoo_sample.cfg zoo.cfg
 vi zoo.cfg
 #若为单机版
 TickTime=2000
@@ -25,8 +25,10 @@ synLimit=2  #同步时间
 initLimit=5
 保存退出
 各服务器均按照此过程安装配置
+
 在zookeeper/data/下新建一个myid，服务器1写入1，服务器2写入2，服务器3写入3
-启动zookeeper：sh /usr/pro/zookeeper/bin/zkServer.sh  restart
+
+启动zookeeper：sh /usr/pro/zookeeper/bin/zkServer.sh  start
 3、STORM安装
 
 解压安装包：tar -zxvf apache-storm-0.10.0.tar.gz
