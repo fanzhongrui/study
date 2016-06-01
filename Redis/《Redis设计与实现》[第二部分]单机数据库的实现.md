@@ -123,7 +123,7 @@ redisDb结构的expires字典保存了数据库中所有键的过期时间，即
 Redis服务器实际使用的是惰性删除和定期删除两种策略：
 > 通过配合使用这两种删除策略，服务器可以很好的在合理使用CPU时间和避免浪费内存空间之间取得平衡。
 
-####过期删除函数
+###过期删除函数
 
 过期键的惰性删除策略由db.c/expireIfNeeded函数实现。
 ```
@@ -193,8 +193,16 @@ int expireIfNeeded(redisDb *db, robj *key) {
 - 如果输入键已经过期，那么expireIfNeeded函数将输入键从数据库中删除
 - 如果输入键未过期，那么expireIfNeeded函数不做操作
 
-####定期删除函数
+###定期删除函数
 过期键的定期删除策略由redis.c/activeExpireCycle函数实现。
+每当Redis的服务器周期性操作redis.c/serverCron函数执行时，actieExpireCycle函数就会被调用，它在规定的时间内，分多次遍历服务器中的各个数据库，从数据库的expires字典中随机检查一部分键的过期时间，并删除其中的过期键。
+
+activeExpireCycle函数的工作模式总结如下：
+
+- 函数每次运行时，都从一定数量的数据库中取出一定数量的随机键进行检查，并删除其中的过期键
+- 全局变量current_db会记录当前activeExpireCycle函数检查的进度，并在下一次activeExpireCycle函数调用时，接着上一次的进度进行处理。
+- 随着activeExpireCycle函数的不断执行，服务器中所有数据库都会被检查一遍，这时函数将current_db变量重置为0，然后再次开始新一轮的检查工作
+
 ```
 /* Try to expire a few timed out keys. The algorithm used is adaptive and
  * will use few CPU cycles if there are few expiring keys, otherwise
@@ -418,10 +426,320 @@ void activeExpireCycle(int type) {
     }
 }
 ```
-每当Redis的服务器周期性操作redis.c/serverCron函数执行时，actieExpireCycle函数就会被调用，它在规定的时间内，分多次遍历服务器中的各个数据库，从数据库的expires字典中随机检查一部分键的过期时间，并删除其中的过期键。
+
+###RDB对过期键的处理
+
+在执行save命令或者BGSAVE命令创建一个新的RDB文件时，程序会对数据库中的键进行检查，已过期的键不会被保存到新创建的RDB文件中。
+
+所以，数据库中包含过期键不会对生存新的RDB文件造成影响。
+
+在启动Redis服务器时，若服务器开启了RDB功能，那么服务器将对RDB文件进行载入：
+
+- 如果服务器以主服务器模式运行，那么载入RDB文件时，程序会对文件中保存的键进行检查，未过期的键会被载入到数据库中，而过期键会被忽略，所以过期键对载入RDB的主服务器不会造成影响
+- 若服务器以从服务器模式运行，那么载入RDB时，文件中保存的所有键，不论是否过期，都会被载入到数据库中。但是，因为主从服务器在进行数据同步的时候，从服务器的数据库就会被清空，所以，过期键对载入RDB文件的从服务器也不会造成影响
+
+###AOF对过期键的处理
+
+在执行AOF重写时，程序会对数据库中的键进行检查，已过期的键不会被保存到重写后的AOF文件中。
+
+###复制对过期键的处理
+
+当服务器运行在复制模式下时，从服务器的过期键删除动作由主服务器控制：
+
+- 主服务器在删除一个过期键之后，会显式地向所有从服务器发送一个del命令，告知从服务器删除这个过期键
+- 从服务器在执行客户端发送的读命令时，即使碰到过期键也不会将过期键删除，而是继续像处理未过期键一样处理过期键
+- 从服务器只有在接到主服务器发来的del命令之后，才会删除过期键。
+
+###数据库通知
+
+数据库通知可以让客户端通过订阅给定的频道或模式，来获知数据库中键的变化，以及数据库中命令的执行情况。
+
+数据库通知分为两类：
+
+- 键空间通知（key-space notification）：某个键执行了什么命令
+- 键事件通知（key-event notification）：某个命令被什么键执行了
+
+服务器配置的notify-keyspace-events选项决定了服务器所发送通知的类型：
+
+- 所有类型的键空间和键事件通知：AKE
+- 所有类型的键空间通知：AK
+- 所有类型的键事件通知：AE
+- 字符串类型的键空间通知：K$
+- 列表类型的键事件通知：El
+
+发送数据库通知的功能是由notify.c/notifyKeyspaceEvent函数实现的：
+void notifyKeyspaceEvent(int type, char *event, robj *key, int dbid);
+
+- type参数是当前想要发送的通知的类型，程序会根据这个值判断通知是否就是服务器配置notify-keyspace-events选项所选定的通知类型，从而决定是否发送通知。
+
+ - event:事件的名称
+
+- keys：产生事件的键
+
+- dbid：产生事件的数据库号码
+
+函数会根据type参数以及这三个参数构建事件通知的内容，以及接收通知的频道名
+
+每当一个Redis命令需要发送数据库通知的时候，该命令的实现函数就会调用notifyKeyspaceEvent函数，并向函数传递该命令所引发的事件的相关信息。
+
+notifyKeyspaceEvent函数执行以下操作：
+
+1. server.notify_keyspace_events属性就是服务器配置notify_keyspace_events选项所设置的值，如果给定的通知类型type不是服务器允许发送的通知类型，那么函数会直接返回，不做任何动作。
+2. 如果给定的通知是服务器允许发送的通知，那么下一步函数会检测服务器是否允许发送键空间通知，若允许，程序就会构建并发送事件通知。
+3. 最后，函数检测服务器是否允许发送键事件通知，若允许，程序就会构建并发送事件通知
+
+```
+/* The API provided to the rest of the Redis core is a simple function:
+ *
+ * notifyKeyspaceEvent(char *event, robj *key, int dbid);
+ *
+ * 'event' is a C string representing the event name.
+ *
+ * event 参数是一个字符串表示的事件名
+ *
+ * 'key' is a Redis object representing the key name.
+ *
+ * key 参数是一个 Redis 对象表示的键名
+ *
+ * 'dbid' is the database ID where the key lives.  
+ *
+ * dbid 参数为键所在的数据库
+ */
+void notifyKeyspaceEvent(int type, char *event, robj *key, int dbid) {
+    sds chan;
+    robj *chanobj, *eventobj;
+    int len = -1;
+    char buf[24];
+
+    /* If notifications for this class of events are off, return ASAP. */
+    // 如果服务器配置为不发送 type 类型的通知，那么直接返回
+    if (!(server.notify_keyspace_events & type)) return;
+
+    // 事件的名字
+    eventobj = createStringObject(event,strlen(event));
+
+    /* __keyspace@<db>__:<key> <event> notifications. */
+    // 发送键空间通知
+    if (server.notify_keyspace_events & REDIS_NOTIFY_KEYSPACE) {
+
+        // 构建频道对象
+        chan = sdsnewlen("__keyspace@",11);
+        len = ll2string(buf,sizeof(buf),dbid);
+        chan = sdscatlen(chan, buf, len);
+        chan = sdscatlen(chan, "__:", 3);
+        chan = sdscatsds(chan, key->ptr);
+
+        chanobj = createObject(REDIS_STRING, chan);
+
+        // 通过 publish 命令发送通知
+        pubsubPublishMessage(chanobj, eventobj);
+
+        // 释放频道对象
+        decrRefCount(chanobj);
+    }
+
+    /* __keyevente@<db>__:<event> <key> notifications. */
+    // 发送键事件通知
+    if (server.notify_keyspace_events & REDIS_NOTIFY_KEYEVENT) {
+
+        // 构建频道对象
+        chan = sdsnewlen("__keyevent@",11);
+        // 如果在前面发送键空间通知的时候计算了 len ，那么它就不会是 -1
+        // 这可以避免计算两次 buf 的长度
+        if (len == -1) len = ll2string(buf,sizeof(buf),dbid);
+        chan = sdscatlen(chan, buf, len);
+        chan = sdscatlen(chan, "__:", 3);
+        chan = sdscatsds(chan, eventobj->ptr);
+
+        chanobj = createObject(REDIS_STRING, chan);
+
+        // 通过 publish 命令发送通知
+        pubsubPublishMessage(chanobj, key);
+
+        // 释放频道对象
+        decrRefCount(chanobj);
+    }
+
+    // 释放事件对象
+    decrRefCount(eventobj);
+}
+```
 
 ##**2、RDB持久化**
 > 关键字：RDB文件解析，自动间隔性保存
+
+Redis提供RDB持久化功能，可以将Redis在内存中的数据库状态保存到磁盘里，避免数据意外丢失。
+
+RDB持久化可以手动执行，也可以根据服务器配置选项定期执行，该功能可以将某个时间点上的数据库状态保存到一个RDB文件中。
+
+RDB持久化功能所生成的RDB文件是一个经过压缩的二进制文件，通过该文件可以还原生成RDB文件时的数据库状态。
+
+save命令生成RDB文件的方式是阻塞Redis服务器进程，直到RDB文件创建完毕，在服务器阻塞期间，服务器不能处理任何命令请求
+
+BGSAVE命令的方式是派生出一个子进程，然后由子进程负责创建RDB文件，服务器进程（父进程）继续处理命令请求
+
+创建RDB文件的实际工作都是由rdb.c/rdbSave函数完成，save命令和bgsave命令会以不同的方式调用这个函数。
+```
+/* Save the DB on disk. Return REDIS_ERR on error, REDIS_OK on success 
+ *
+ * 将数据库保存到磁盘上。
+ *
+ * 保存成功返回 REDIS_OK ，出错/失败返回 REDIS_ERR 。
+ */
+int rdbSave(char *filename) {
+    dictIterator *di = NULL;
+    dictEntry *de;
+    char tmpfile[256];
+    char magic[10];
+    int j;
+    long long now = mstime();
+    FILE *fp;
+    rio rdb;
+    uint64_t cksum;
+
+    // 创建临时文件
+    snprintf(tmpfile,256,"temp-%d.rdb", (int) getpid());
+    fp = fopen(tmpfile,"w");
+    if (!fp) {
+        redisLog(REDIS_WARNING, "Failed opening .rdb for saving: %s",
+            strerror(errno));
+        return REDIS_ERR;
+    }
+
+    // 初始化 I/O
+    rioInitWithFile(&rdb,fp);
+
+    // 设置校验和函数
+    if (server.rdb_checksum)
+        rdb.update_cksum = rioGenericUpdateChecksum;
+
+    // 写入 RDB 版本号
+    snprintf(magic,sizeof(magic),"REDIS%04d",REDIS_RDB_VERSION);
+    if (rdbWriteRaw(&rdb,magic,9) == -1) goto werr;
+
+    // 遍历所有数据库
+    for (j = 0; j < server.dbnum; j++) {
+
+        // 指向数据库
+        redisDb *db = server.db+j;
+
+        // 指向数据库键空间
+        dict *d = db->dict;
+
+        // 跳过空数据库
+        if (dictSize(d) == 0) continue;
+
+        // 创建键空间迭代器
+        di = dictGetSafeIterator(d);
+        if (!di) {
+            fclose(fp);
+            return REDIS_ERR;
+        }
+
+        /* Write the SELECT DB opcode 
+         *
+         * 写入 DB 选择器
+         */
+        if (rdbSaveType(&rdb,REDIS_RDB_OPCODE_SELECTDB) == -1) goto werr;
+        if (rdbSaveLen(&rdb,j) == -1) goto werr;
+
+        /* Iterate this DB writing every entry 
+         *
+         * 遍历数据库，并写入每个键值对的数据
+         */
+        while((de = dictNext(di)) != NULL) {
+            sds keystr = dictGetKey(de);
+            robj key, *o = dictGetVal(de);
+            long long expire;
+            
+            // 根据 keystr ，在栈中创建一个 key 对象
+            initStaticStringObject(key,keystr);
+
+            // 获取键的过期时间
+            expire = getExpire(db,&key);
+
+            // 保存键值对数据
+            if (rdbSaveKeyValuePair(&rdb,&key,o,expire,now) == -1) goto werr;
+        }
+        dictReleaseIterator(di);
+    }
+    di = NULL; /* So that we don't release it again on error. */
+
+    /* EOF opcode 
+     *
+     * 写入 EOF 代码
+     */
+    if (rdbSaveType(&rdb,REDIS_RDB_OPCODE_EOF) == -1) goto werr;
+
+    /* CRC64 checksum. It will be zero if checksum computation is disabled, the
+     * loading code skips the check in this case. 
+     *
+     * CRC64 校验和。
+     *
+     * 如果校验和功能已关闭，那么 rdb.cksum 将为 0 ，
+     * 在这种情况下， RDB 载入时会跳过校验和检查。
+     */
+    cksum = rdb.cksum;
+    memrev64ifbe(&cksum);
+    rioWrite(&rdb,&cksum,8);
+
+    /* Make sure data will not remain on the OS's output buffers */
+    // 冲洗缓存，确保数据已写入磁盘
+    if (fflush(fp) == EOF) goto werr;
+    if (fsync(fileno(fp)) == -1) goto werr;
+    if (fclose(fp) == EOF) goto werr;
+
+    /* Use RENAME to make sure the DB file is changed atomically only
+     * if the generate DB file is ok. 
+     *
+     * 使用 RENAME ，原子性地对临时文件进行改名，覆盖原来的 RDB 文件。
+     */
+    if (rename(tmpfile,filename) == -1) {
+        redisLog(REDIS_WARNING,"Error moving temp DB file on the final destination: %s", strerror(errno));
+        unlink(tmpfile);
+        return REDIS_ERR;
+    }
+
+    // 写入完成，打印日志
+    redisLog(REDIS_NOTICE,"DB saved on disk");
+
+    // 清零数据库脏状态
+    server.dirty = 0;
+
+    // 记录最后一次完成 SAVE 的时间
+    server.lastsave = time(NULL);
+
+    // 记录最后一次执行 SAVE 的状态
+    server.lastbgsave_status = REDIS_OK;
+
+    return REDIS_OK;
+
+werr:
+    // 关闭文件
+    fclose(fp);
+    // 删除文件
+    unlink(tmpfile);
+
+    redisLog(REDIS_WARNING,"Write error saving DB on disk: %s", strerror(errno));
+
+    if (di) dictReleaseIterator(di);
+
+    return REDIS_ERR;
+}
+```
+RDB文件的载入工作是在服务器启动时自动执行的，所以redis没有专门用于载入RDB文件的命令，只要redis服务器在启动时检测到RDB文件存在，就会自动载入RDB文件
+
+因为AOF文件的更新频率通常比RDB文件的更新频率高，所以：
+
+- 若服务器开启了AOF持久化功能，那么服务器就优先使用AOF文件还原数据库状态
+- 只有在AOF持久化功能处于关闭状态时，服务器才会使用RDB文件来还原数据库状态
+
+BGSAVE命令执行期间，客户端发送的save和BGSAVE命令都会被服务器拒绝，防止产生竞态条件
+
+从性能考虑，BGREWRITEAOF和BGSAVE命令不能同时执行：
+
+- 若BGSAVE命令正在执行，那么客户端发送的BGREWRITEAOF命令会被延迟到BGSAVE命令执行完毕之后执行
+- BGREWRITEAOF命令正在执行，那么客户端发送的BGSAVE命令会被服务器拒绝
 
 ##**3、AOF持久化**
 > 关键字：AOF持久化：文件写入与同步，AOF文件重写，数据一致性
