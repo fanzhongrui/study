@@ -965,8 +965,359 @@ RDB文件中的每个value部分都保存了一个值对象，每个值对象的
 ###**分析RDB文件**
 
 可以使用-od命令分析redis服务器产生的RDB文件，该命令可以用给定的格式转存（dump）并打印输入文件，比如，给定-c参数可以以ASCII编码的方式打印输入文件，给定-x参数可以以十六进制的方式打印输入文件
+
 ##**3、AOF持久化**
 > 关键字：AOF持久化：文件写入与同步，AOF文件重写，数据一致性
+
+与RDB持久化通过保存数据库中的键值对来记录数据库状态不同，AOF持久化是通过保存redis服务器所执行的写命令来记录数据库状态的
+
+被写入AOF文件的所有命令都是以redis的命令请求协议格式保存的，因为redis的命令请求协议是纯文本格式，所以可以直接打开一个AOF文件，观察里面的内容
+
+AOF文件初始会自动添加一个用于指定数据库的select命令。
+
+服务器在启动时，可以通过载入和执行AOF文件中保存的命令来还原服务器关闭之前的数据库状态
+
+###AOF持久化的实现
+
+AOF持久化功能的实现分为命令追加（append）、文件写入、文件同步（sync）三个步骤。
+
+```
+struct redisServer{
+    // ...
+     /* AOF persistence */
+
+    // AOF 状态（开启/关闭/可写）
+    int aof_state;                  /* REDIS_AOF_(ON|OFF|WAIT_REWRITE) */
+
+    // 所使用的 fsync 策略（每个写入/每秒/从不）
+    int aof_fsync;                  /* Kind of fsync() policy */
+    char *aof_filename;             /* Name of the AOF file */
+    int aof_no_fsync_on_rewrite;    /* Don't fsync if a rewrite is in prog. */
+    int aof_rewrite_perc;           /* Rewrite AOF if % growth is > M and... */
+    off_t aof_rewrite_min_size;     /* the AOF file is at least N bytes. */
+
+    // 最后一次执行 BGREWRITEAOF 时， AOF 文件的大小
+    off_t aof_rewrite_base_size;    /* AOF size on latest startup or rewrite. */
+
+    // AOF 文件的当前字节大小
+    off_t aof_current_size;         /* AOF current size. */
+    //记录服务器是否延迟了bgrewriteaof即AOF重写命令，如果值为1 ，表示有AOF重写命令被延迟了
+    int aof_rewrite_scheduled;      /* Rewrite once BGSAVE terminates. */
+
+    // 负责进行 AOF 重写的子进程 ID，如果没有执行，属性值为-1
+    pid_t aof_child_pid;            /* PID if rewriting process */
+
+    // AOF 重写缓存链表，链接着多个缓存块
+    list *aof_rewrite_buf_blocks;   /* Hold changes during an AOF rewrite. */
+
+    // AOF 缓冲区
+    sds aof_buf;      /* AOF buffer, written before entering the event loop */
+
+    // AOF 文件的描述符
+    int aof_fd;       /* File descriptor of currently selected AOF file */
+
+    // AOF 的当前目标数据库
+    int aof_selected_db; /* Currently selected DB in AOF */
+
+    // 推迟 write 操作的时间
+    time_t aof_flush_postponed_start; /* UNIX time of postponed AOF flush */
+
+    // 最后一直执行 fsync 的时间
+    time_t aof_last_fsync;            /* UNIX time of last fsync() */
+    time_t aof_rewrite_time_last;   /* Time used by last AOF rewrite run. */
+
+    // AOF 重写的开始时间
+    time_t aof_rewrite_time_start;  /* Current AOF rewrite start time. */
+
+    // 最后一次执行 BGREWRITEAOF 的结果
+    int aof_lastbgrewrite_status;   /* REDIS_OK or REDIS_ERR */
+
+    // 记录 AOF 的 write 操作被推迟了多少次
+    unsigned long aof_delayed_fsync;  /* delayed AOF fsync() counter */
+
+    // 指示是否需要每写入一定量的数据，就主动执行一次 fsync()
+    int aof_rewrite_incremental_fsync;/* fsync incrementally while rewriting? */
+    int aof_last_write_status;      /* REDIS_OK or REDIS_ERR */
+    int aof_last_write_errno;       /* Valid if aof_last_write_status is ERR */
+    // ...
+};
+```
+当AOF持久化功能处于打开状态（aof_state为REDIS_AOF_ON）时，服务器在执行完一个写命令之后，会以协议格式将被执行的写命令追加到服务器的aof_buf缓冲区的末尾
+
+Redis的服务器进程就是一个事件循环（loop），这个循环中的文件事件负责接收客户端的命令请求，以及向客户端发送命令回复，而时间事件则负责执行像serverCron函数这样需要定时运行的函数
+
+因为服务器在处理文件事件时可能会执行写命令，使得一些内容被追加到aof_buf缓冲区里面，所以在服务器每次结束一个事件循环之前，它都会调用flushAppendOnlyFile函数，考虑是否需要将aof_buf缓冲区中的内容写入和保存到AOF文件里面：
+```
+/* Write the append only file buffer on disk.
+ *
+ * 将 AOF 缓存写入到文件中。
+ *
+ * Since we are required to write the AOF before replying to the client,
+ * and the only way the client socket can get a write is entering when the
+ * the event loop, we accumulate all the AOF writes in a memory
+ * buffer and write it on disk using this function just before entering
+ * the event loop again.
+ *
+ * 因为程序需要在回复客户端之前对 AOF 执行写操作。
+ * 而客户端能执行写操作的唯一机会就是在事件 loop 中，
+ * 因此，程序将所有 AOF 写累积到缓存中，
+ * 并在重新进入事件 loop 之前，将缓存写入到文件中。
+ *
+ * About the 'force' argument:
+ *
+ * 关于 force 参数：
+ *
+ * When the fsync policy is set to 'everysec' we may delay the flush if there
+ * is still an fsync() going on in the background thread, since for instance
+ * on Linux write(2) will be blocked by the background fsync anyway.
+ *
+ * 当 fsync 策略为每秒钟保存一次时，如果后台线程仍然有 fsync 在执行，
+ * 那么我们可能会延迟执行冲洗（flush）操作，
+ * 因为 Linux 上的 write(2) 会被后台的 fsync 阻塞。
+ *
+ * When this happens we remember that there is some aof buffer to be
+ * flushed ASAP, and will try to do that in the serverCron() function.
+ *
+ * 当这种情况发生时，说明需要尽快冲洗 aof 缓存，
+ * 程序会尝试在 serverCron() 函数中对缓存进行冲洗。
+ *
+ * However if force is set to 1 we'll write regardless of the background
+ * fsync. 
+ *
+ * 不过，如果 force 为 1 的话，那么不管后台是否正在 fsync ，
+ * 程序都直接进行写入。
+ */
+#define AOF_WRITE_LOG_ERROR_RATE 30 /* Seconds between errors logging. */
+void flushAppendOnlyFile(int force) {
+    ssize_t nwritten;
+    int sync_in_progress = 0;
+
+    // 缓冲区中没有任何内容，直接返回
+    if (sdslen(server.aof_buf) == 0) return;
+
+    // 策略为每秒 FSYNC 
+    if (server.aof_fsync == AOF_FSYNC_EVERYSEC)
+        // 是否有 SYNC 正在后台进行？
+        sync_in_progress = bioPendingJobsOfType(REDIS_BIO_AOF_FSYNC) != 0;
+
+    // 每秒 fsync ，并且强制写入为假
+    if (server.aof_fsync == AOF_FSYNC_EVERYSEC && !force) {
+
+        /* With this append fsync policy we do background fsyncing.
+         *
+         * 当 fsync 策略为每秒钟一次时， fsync 在后台执行。
+         *
+         * If the fsync is still in progress we can try to delay
+         * the write for a couple of seconds. 
+         *
+         * 如果后台仍在执行 FSYNC ，那么我们可以延迟写操作一两秒
+         * （如果强制执行 write 的话，服务器主线程将阻塞在 write 上面）
+         */
+        if (sync_in_progress) {
+
+            // 有 fsync 正在后台进行 。。。
+
+            if (server.aof_flush_postponed_start == 0) {
+                /* No previous write postponinig, remember that we are
+                 * postponing the flush and return. 
+                 *
+                 * 前面没有推迟过 write 操作，这里将推迟写操作的时间记录下来
+                 * 然后就返回，不执行 write 或者 fsync
+                 */
+                server.aof_flush_postponed_start = server.unixtime;
+                return;
+
+            } else if (server.unixtime - server.aof_flush_postponed_start < 2) {
+                /* We were already waiting for fsync to finish, but for less
+                 * than two seconds this is still ok. Postpone again. 
+                 *
+                 * 如果之前已经因为 fsync 而推迟了 write 操作
+                 * 但是推迟的时间不超过 2 秒，那么直接返回
+                 * 不执行 write 或者 fsync
+                 */
+                return;
+
+            }
+
+            /* Otherwise fall trough, and go write since we can't wait
+             * over two seconds. 
+             *
+             * 如果后台还有 fsync 在执行，并且 write 已经推迟 >= 2 秒
+             * 那么执行写操作（write 将被阻塞）
+             */
+            server.aof_delayed_fsync++;
+            redisLog(REDIS_NOTICE,"Asynchronous AOF fsync is taking too long (disk is busy?). Writing the AOF buffer without waiting for fsync to complete, this may slow down Redis.");
+        }
+    }
+
+    /* If you are following this code path, then we are going to write so
+     * set reset the postponed flush sentinel to zero. 
+     *
+     * 执行到这里，程序会对 AOF 文件进行写入。
+     *
+     * 清零延迟 write 的时间记录
+     */
+    server.aof_flush_postponed_start = 0;
+
+    /* We want to perform a single write. This should be guaranteed atomic
+     * at least if the filesystem we are writing is a real physical one.
+     *
+     * 执行单个 write 操作，如果写入设备是物理的话，那么这个操作应该是原子的
+     *
+     * While this will save us against the server being killed I don't think
+     * there is much to do about the whole server stopping for power problems
+     * or alike 
+     *
+     * 当然，如果出现像电源中断这样的不可抗现象，那么 AOF 文件也是可能会出现问题的
+     * 这时就要用 redis-check-aof 程序来进行修复。
+     */
+    nwritten = write(server.aof_fd,server.aof_buf,sdslen(server.aof_buf));
+    if (nwritten != (signed)sdslen(server.aof_buf)) {
+
+        static time_t last_write_error_log = 0;
+        int can_log = 0;
+
+        /* Limit logging rate to 1 line per AOF_WRITE_LOG_ERROR_RATE seconds. */
+        // 将日志的记录频率限制在每行 AOF_WRITE_LOG_ERROR_RATE 秒
+        if ((server.unixtime - last_write_error_log) > AOF_WRITE_LOG_ERROR_RATE) {
+            can_log = 1;
+            last_write_error_log = server.unixtime;
+        }
+
+        /* Lof the AOF write error and record the error code. */
+        // 如果写入出错，那么尝试将该情况写入到日志里面
+        if (nwritten == -1) {
+            if (can_log) {
+                redisLog(REDIS_WARNING,"Error writing to the AOF file: %s",
+                    strerror(errno));
+                server.aof_last_write_errno = errno;
+            }
+        } else {
+            if (can_log) {
+                redisLog(REDIS_WARNING,"Short write while writing to "
+                                       "the AOF file: (nwritten=%lld, "
+                                       "expected=%lld)",
+                                       (long long)nwritten,
+                                       (long long)sdslen(server.aof_buf));
+            }
+
+            // 尝试移除新追加的不完整内容
+            if (ftruncate(server.aof_fd, server.aof_current_size) == -1) {
+                if (can_log) {
+                    redisLog(REDIS_WARNING, "Could not remove short write "
+                             "from the append-only file.  Redis may refuse "
+                             "to load the AOF the next time it starts.  "
+                             "ftruncate: %s", strerror(errno));
+                }
+            } else {
+                /* If the ftrunacate() succeeded we can set nwritten to
+                 * -1 since there is no longer partial data into the AOF. */
+                nwritten = -1;
+            }
+            server.aof_last_write_errno = ENOSPC;
+        }
+
+        /* Handle the AOF write error. */
+        // 处理写入 AOF 文件时出现的错误
+        if (server.aof_fsync == AOF_FSYNC_ALWAYS) {
+            /* We can't recover when the fsync policy is ALWAYS since the
+             * reply for the client is already in the output buffers, and we
+             * have the contract with the user that on acknowledged write data
+             * is synched on disk. */
+            redisLog(REDIS_WARNING,"Can't recover from AOF write error when the AOF fsync policy is 'always'. Exiting...");
+            exit(1);
+        } else {
+            /* Recover from failed write leaving data into the buffer. However
+             * set an error to stop accepting writes as long as the error
+             * condition is not cleared. */
+            server.aof_last_write_status = REDIS_ERR;
+
+            /* Trim the sds buffer if there was a partial write, and there
+             * was no way to undo it with ftruncate(2). */
+            if (nwritten > 0) {
+                server.aof_current_size += nwritten;
+                sdsrange(server.aof_buf,nwritten,-1);
+            }
+            return; /* We'll try again on the next call... */
+        }
+    } else {
+        /* Successful write(2). If AOF was in error state, restore the
+         * OK state and log the event. */
+        // 写入成功，更新最后写入状态
+        if (server.aof_last_write_status == REDIS_ERR) {
+            redisLog(REDIS_WARNING,
+                "AOF write error looks solved, Redis can write again.");
+            server.aof_last_write_status = REDIS_OK;
+        }
+    }
+
+    // 更新写入后的 AOF 文件大小
+    server.aof_current_size += nwritten;
+
+    /* Re-use AOF buffer when it is small enough. The maximum comes from the
+     * arena size of 4k minus some overhead (but is otherwise arbitrary). 
+     *
+     * 如果 AOF 缓存的大小足够小的话，那么重用这个缓存，
+     * 否则的话，释放 AOF 缓存。
+     */
+    if ((sdslen(server.aof_buf)+sdsavail(server.aof_buf)) < 4000) {
+        // 清空缓存中的内容，等待重用
+        sdsclear(server.aof_buf);
+    } else {
+        // 释放缓存
+        sdsfree(server.aof_buf);
+        server.aof_buf = sdsempty();
+    }
+
+    /* Don't fsync if no-appendfsync-on-rewrite is set to yes and there are
+     * children doing I/O in the background. 
+     *
+     * 如果 no-appendfsync-on-rewrite 选项为开启状态，
+     * 并且有 BGSAVE 或者 BGREWRITEAOF 正在进行的话，
+     * 那么不执行 fsync 
+     */
+    if (server.aof_no_fsync_on_rewrite &&
+        (server.aof_child_pid != -1 || server.rdb_child_pid != -1))
+            return;
+
+    /* Perform the fsync if needed. */
+
+    // 总是执行 fsnyc
+    if (server.aof_fsync == AOF_FSYNC_ALWAYS) {
+        /* aof_fsync is defined as fdatasync() for Linux in order to avoid
+         * flushing metadata. */
+        aof_fsync(server.aof_fd); /* Let's try to get this data on the disk */
+
+        // 更新最后一次执行 fsnyc 的时间
+        server.aof_last_fsync = server.unixtime;
+
+    // 策略为每秒 fsnyc ，并且距离上次 fsync 已经超过 1 秒
+    } else if ((server.aof_fsync == AOF_FSYNC_EVERYSEC &&
+                server.unixtime > server.aof_last_fsync)) {
+        // 放到后台执行
+        if (!sync_in_progress) aof_background_fsync(server.aof_fd);
+        // 更新最后一次执行 fsync 的时间
+        server.aof_last_fsync = server.unixtime;
+    }
+
+    // 其实上面无论执行 if 部分还是 else 部分都要更新 fsync 的时间
+    // 可以将代码挪到下面来
+    // server.aof_last_fsync = server.unixtime;
+}
+```
+flushAppendOnlyFile函数的行为由服务器配置的appendfsync选项的值来决定“
+
+- always：服务器在每个事件循环都要将aof_buf缓冲区中的所有内容写入并同步到AOF文件，效率最慢但最安全
+
+- everysec：服务器在每个事件循环都要将aof_buf缓冲区中的所有内容写入到AOF文件，如果上次同步AOF文件的时间距离现在超过1s，那么再次对AOF文件进行同步，并且这个同步操作是由一个线程专门负责执行的
+
+- no：服务器在每个事件循环都要将aof_buf缓冲区中的所有内容写入到AOF文件，但不对AOF文件进行同步，何时同步由操作系统决定，速度最快，安全性最低
+- 默认为everysec
+
+用户调用write函数，将一些数据写入到文件的时候，操作系统通常会将写入数据暂时保存在一个内存缓冲区中，等到缓冲区的空间被填满、或者超过了指定的时限之后，才真正地将缓冲区中的数据写入到磁盘。  
+虽然提高了效率，但为写入数据带来了安全问题，如果计算机发生停机，那么保存在内存缓冲区里面的写入数据将会丢失。
+
+redis提供了fsync和fdatasync两个同步函数，它们可以强制让操作系统立即将缓冲区中的数据写入到硬盘中，从而确保写入数据的安全性。
 
 ##**4、事件**
 > 关键字：I/O并发模式，文件事件处理器，时间事件处理器
