@@ -1319,6 +1319,304 @@ flushAppendOnlyFile函数的行为由服务器配置的appendfsync选项的值�
 
 redis提供了fsync和fdatasync两个同步函数，它们可以强制让操作系统立即将缓冲区中的数据写入到硬盘中，从而确保写入数据的安全性。
 
+###AOF文件的载入与数据还原
+
+redis读取AOF文件并还原数据库状态的详细步骤如下：
+
+1. 创建一个不带网络连接的伪客户端（fake client）：因为redis的命令只能在客户端上下文中执行，而载入AOF文件时所使用的命令直接来源于AOF文件而不是网络连接，所以服务器使用了一个没有网络连接的伪客户端来执行AOF文件保存的写命令，伪客户端执行命令的效果和带网络连接的客户端执行命令的效果完全一样。
+
+2. 从AOF文件中分析并读取一条写命令
+3. 使用伪客户端执行被读出的写命令
+4. 一直执行步骤2和步骤3，直到AOF文件中的所有写命令都被处理完毕为止
+
+###AOF重写
+为了解决AOF文件体积膨胀问题，redis提供了AOF文件重写（rewrite）功能。通过该功能，Redis服务器可以创建一个新的AOF文件来替代现有的AOF文件，新旧两个AOF文件所保存的数据库状态相同，但新AOF文件不会包含任何浪费空间的冗余命令，所以新AOF文件的体积通常会比旧AOF文件体积要小得多。
+
+AOF文件重写并不需要对现有的AOF文件进行任何读取、分析或写入操作，这个功能是通过读取服务器当前的数据库状态来实现的。
+
+首先从数据库中读取键现在的值，然后用一条命令去记录键值对，代替之前记录这个键值对的多条命令，这就是AOF重写功能的实现原理。
+rewriteAppendOnlyFileBackground函数的实现：
+```
+/* This is how rewriting of the append only file in background works:
+ * 
+ * 以下是后台重写 AOF 文件（BGREWRITEAOF）的工作步骤：
+ *
+ * 1) The user calls BGREWRITEAOF
+ *    用户调用 BGREWRITEAOF
+ *
+ * 2) Redis calls this function, that forks():
+ *    Redis 调用这个函数，它执行 fork() ：
+ *
+ *    2a) the child rewrite the append only file in a temp file.
+ *        子进程在临时文件中对 AOF 文件进行重写
+ *
+ *    2b) the parent accumulates differences in server.aof_rewrite_buf.
+ *        父进程将新输入的写命令追加到 server.aof_rewrite_buf 中
+ *
+ * 3) When the child finished '2a' exists.
+ *    当步骤 2a 执行完之后，子进程结束
+ *
+ * 4) The parent will trap the exit code, if it's OK, will append the
+ *    data accumulated into server.aof_rewrite_buf into the temp file, and
+ *    finally will rename(2) the temp file in the actual file name.
+ *    The the new file is reopened as the new append only file. Profit!
+ *
+ *    父进程会捕捉子进程的退出信号，
+ *    如果子进程的退出状态是 OK 的话，
+ *    那么父进程将新输入命令的缓存追加到临时文件，
+ *    然后使用 rename(2) 对临时文件改名，用它代替旧的 AOF 文件，
+ *    至此，后台 AOF 重写完成。
+ */
+int rewriteAppendOnlyFileBackground(void) {
+    pid_t childpid;
+    long long start;
+
+    // 已经有进程在进行 AOF 重写了
+    if (server.aof_child_pid != -1) return REDIS_ERR;
+
+    // 记录 fork 开始前的时间，计算 fork 耗时用
+    start = ustime();
+
+    if ((childpid = fork()) == 0) {
+        char tmpfile[256];
+
+        /* Child */
+
+        // 关闭网络连接 fd
+        closeListeningSockets(0);
+
+        // 为进程设置名字，方便记认
+        redisSetProcTitle("redis-aof-rewrite");
+
+        // 创建临时文件，并进行 AOF 重写
+        snprintf(tmpfile,256,"temp-rewriteaof-bg-%d.aof", (int) getpid());
+        if (rewriteAppendOnlyFile(tmpfile) == REDIS_OK) {
+            size_t private_dirty = zmalloc_get_private_dirty();
+
+            if (private_dirty) {
+                redisLog(REDIS_NOTICE,
+                    "AOF rewrite: %zu MB of memory used by copy-on-write",
+                    private_dirty/(1024*1024));
+            }
+            // 发送重写成功信号
+            exitFromChild(0);
+        } else {
+            // 发送重写失败信号
+            exitFromChild(1);
+        }
+    } else {
+        /* Parent */
+        // 记录执行 fork 所消耗的时间
+        server.stat_fork_time = ustime()-start;
+
+        if (childpid == -1) {
+            redisLog(REDIS_WARNING,
+                "Can't rewrite append only file in background: fork: %s",
+                strerror(errno));
+            return REDIS_ERR;
+        }
+
+        redisLog(REDIS_NOTICE,
+            "Background append only file rewriting started by pid %d",childpid);
+
+        // 记录 AOF 重写的信息
+        server.aof_rewrite_scheduled = 0;
+        server.aof_rewrite_time_start = time(NULL);
+        server.aof_child_pid = childpid;
+
+        // 关闭字典自动 rehash
+        updateDictResizePolicy();
+
+        /* We set appendseldb to -1 in order to force the next call to the
+         * feedAppendOnlyFile() to issue a SELECT command, so the differences
+         * accumulated by the parent into server.aof_rewrite_buf will start
+         * with a SELECT statement and it will be safe to merge. 
+         *
+         * 将 aof_selected_db 设为 -1 ，
+         * 强制让 feedAppendOnlyFile() 下次执行时引发一个 SELECT 命令，
+         * 从而确保之后新添加的命令会设置到正确的数据库中
+         */
+        server.aof_selected_db = -1;
+        replicationScriptCacheFlush();
+        return REDIS_OK;
+    }
+    return REDIS_OK; /* unreached */
+}
+```
+rewriteAppendOnlyFile函数的实现：
+```
+/* Write a sequence of commands able to fully rebuild the dataset into
+ * "filename". Used both by REWRITEAOF and BGREWRITEAOF.
+ *
+ * 将一个足以还原当前数据集的命令序列写入到 filename 指定的文件中。
+ *
+ * 这个函数被 REWRITEAOF 和 BGREWRITEAOF 两个命令调用。
+ * （REWRITEAOF 似乎已经是一个废弃的命令）
+ *
+ * In order to minimize the number of commands needed in the rewritten
+ * log Redis uses variadic commands when possible, such as RPUSH, SADD
+ * and ZADD. However at max REDIS_AOF_REWRITE_ITEMS_PER_CMD items per time
+ * are inserted using a single command. 
+ *
+ * 为了最小化重建数据集所需执行的命令数量，
+ * Redis 会尽可能地使用接受可变参数数量的命令，比如 RPUSH 、SADD 和 ZADD 等。
+ *
+ * 不过单个命令每次处理的元素数量不能超过 REDIS_AOF_REWRITE_ITEMS_PER_CMD 。
+ */
+int rewriteAppendOnlyFile(char *filename) {
+    dictIterator *di = NULL;
+    dictEntry *de;
+    rio aof;
+    FILE *fp;
+    char tmpfile[256];
+    int j;
+    long long now = mstime();
+
+    /* Note that we have to use a different temp name here compared to the
+     * one used by rewriteAppendOnlyFileBackground() function. 
+     *
+     * 创建临时文件
+     *
+     * 注意这里创建的文件名和 rewriteAppendOnlyFileBackground() 创建的文件名稍有不同
+     */
+    snprintf(tmpfile,256,"temp-rewriteaof-%d.aof", (int) getpid());
+    fp = fopen(tmpfile,"w");
+    if (!fp) {
+        redisLog(REDIS_WARNING, "Opening the temp file for AOF rewrite in rewriteAppendOnlyFile(): %s", strerror(errno));
+        return REDIS_ERR;
+    }
+
+    // 初始化文件 io
+    rioInitWithFile(&aof,fp);
+
+    // 设置每写入 REDIS_AOF_AUTOSYNC_BYTES 字节
+    // 就执行一次 FSYNC 
+    // 防止缓存中积累太多命令内容，造成 I/O 阻塞时间过长
+    if (server.aof_rewrite_incremental_fsync)
+        rioSetAutoSync(&aof,REDIS_AOF_AUTOSYNC_BYTES);
+
+    // 遍历所有数据库
+    for (j = 0; j < server.dbnum; j++) {
+
+        char selectcmd[] = "*2\r\n$6\r\nSELECT\r\n";
+
+        redisDb *db = server.db+j;
+
+        // 指向键空间
+        dict *d = db->dict;
+        if (dictSize(d) == 0) continue;
+
+        // 创建键空间迭代器
+        di = dictGetSafeIterator(d);
+        if (!di) {
+            fclose(fp);
+            return REDIS_ERR;
+        }
+
+        /* SELECT the new DB 
+         *
+         * 首先写入 SELECT 命令，确保之后的数据会被插入到正确的数据库上
+         */
+        if (rioWrite(&aof,selectcmd,sizeof(selectcmd)-1) == 0) goto werr;
+        if (rioWriteBulkLongLong(&aof,j) == 0) goto werr;
+
+        /* Iterate this DB writing every entry 
+         *
+         * 遍历数据库所有键，并通过命令将它们的当前状态（值）记录到新 AOF 文件中
+         */
+        while((de = dictNext(di)) != NULL) {
+            sds keystr;
+            robj key, *o;
+            long long expiretime;
+
+            // 取出键
+            keystr = dictGetKey(de);
+
+            // 取出值
+            o = dictGetVal(de);
+            initStaticStringObject(key,keystr);
+
+            // 取出过期时间
+            expiretime = getExpire(db,&key);
+
+            /* If this key is already expired skip it 
+             *
+             * 如果键已经过期，那么跳过它，不保存
+             */
+            if (expiretime != -1 && expiretime < now) continue;
+
+            /* Save the key and associated value 
+             *
+             * 根据值的类型，选择适当的命令来保存值
+             */
+            if (o->type == REDIS_STRING) {
+                /* Emit a SET command */
+                char cmd[]="*3\r\n$3\r\nSET\r\n";
+                if (rioWrite(&aof,cmd,sizeof(cmd)-1) == 0) goto werr;
+                /* Key and value */
+                if (rioWriteBulkObject(&aof,&key) == 0) goto werr;
+                if (rioWriteBulkObject(&aof,o) == 0) goto werr;
+            } else if (o->type == REDIS_LIST) {
+                if (rewriteListObject(&aof,&key,o) == 0) goto werr;
+            } else if (o->type == REDIS_SET) {
+                if (rewriteSetObject(&aof,&key,o) == 0) goto werr;
+            } else if (o->type == REDIS_ZSET) {
+                if (rewriteSortedSetObject(&aof,&key,o) == 0) goto werr;
+            } else if (o->type == REDIS_HASH) {
+                if (rewriteHashObject(&aof,&key,o) == 0) goto werr;
+            } else {
+                redisPanic("Unknown object type");
+            }
+
+            /* Save the expire time 
+             *
+             * 保存键的过期时间
+             */
+            if (expiretime != -1) {
+                char cmd[]="*3\r\n$9\r\nPEXPIREAT\r\n";
+
+                // 写入 PEXPIREAT expiretime 命令
+                if (rioWrite(&aof,cmd,sizeof(cmd)-1) == 0) goto werr;
+                if (rioWriteBulkObject(&aof,&key) == 0) goto werr;
+                if (rioWriteBulkLongLong(&aof,expiretime) == 0) goto werr;
+            }
+        }
+
+        // 释放迭代器
+        dictReleaseIterator(di);
+    }
+
+    /* Make sure data will not remain on the OS's output buffers */
+    // 冲洗并关闭新 AOF 文件
+    if (fflush(fp) == EOF) goto werr;
+    if (aof_fsync(fileno(fp)) == -1) goto werr;
+    if (fclose(fp) == EOF) goto werr;
+
+    /* Use RENAME to make sure the DB file is changed atomically only
+     * if the generate DB file is ok. 
+     *
+     * 原子地改名，用重写后的新 AOF 文件覆盖旧 AOF 文件
+     */
+    if (rename(tmpfile,filename) == -1) {
+        redisLog(REDIS_WARNING,"Error moving temp append only file on the final destination: %s", strerror(errno));
+        unlink(tmpfile);
+        return REDIS_ERR;
+    }
+
+    redisLog(REDIS_NOTICE,"SYNC append only file rewrite performed");
+
+    return REDIS_OK;
+
+werr:
+    fclose(fp);
+    unlink(tmpfile);
+    redisLog(REDIS_WARNING,"Write error writing append only file on disk: %s", strerror(errno));
+    if (di) dictReleaseIterator(di);
+    return REDIS_ERR;
+}
+```
+
+
 ##**4、事件**
 > 关键字：I/O并发模式，文件事件处理器，时间事件处理器
 
