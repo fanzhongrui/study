@@ -1335,114 +1335,7 @@ redis读取AOF文件并还原数据库状态的详细步骤如下：
 AOF文件重写并不需要对现有的AOF文件进行任何读取、分析或写入操作，这个功能是通过读取服务器当前的数据库状态来实现的。
 
 首先从数据库中读取键现在的值，然后用一条命令去记录键值对，代替之前记录这个键值对的多条命令，这就是AOF重写功能的实现原理。
-rewriteAppendOnlyFileBackground函数的实现：
-```
-/* This is how rewriting of the append only file in background works:
- * 
- * 以下是后台重写 AOF 文件（BGREWRITEAOF）的工作步骤：
- *
- * 1) The user calls BGREWRITEAOF
- *    用户调用 BGREWRITEAOF
- *
- * 2) Redis calls this function, that forks():
- *    Redis 调用这个函数，它执行 fork() ：
- *
- *    2a) the child rewrite the append only file in a temp file.
- *        子进程在临时文件中对 AOF 文件进行重写
- *
- *    2b) the parent accumulates differences in server.aof_rewrite_buf.
- *        父进程将新输入的写命令追加到 server.aof_rewrite_buf 中
- *
- * 3) When the child finished '2a' exists.
- *    当步骤 2a 执行完之后，子进程结束
- *
- * 4) The parent will trap the exit code, if it's OK, will append the
- *    data accumulated into server.aof_rewrite_buf into the temp file, and
- *    finally will rename(2) the temp file in the actual file name.
- *    The the new file is reopened as the new append only file. Profit!
- *
- *    父进程会捕捉子进程的退出信号，
- *    如果子进程的退出状态是 OK 的话，
- *    那么父进程将新输入命令的缓存追加到临时文件，
- *    然后使用 rename(2) 对临时文件改名，用它代替旧的 AOF 文件，
- *    至此，后台 AOF 重写完成。
- */
-int rewriteAppendOnlyFileBackground(void) {
-    pid_t childpid;
-    long long start;
 
-    // 已经有进程在进行 AOF 重写了
-    if (server.aof_child_pid != -1) return REDIS_ERR;
-
-    // 记录 fork 开始前的时间，计算 fork 耗时用
-    start = ustime();
-
-    if ((childpid = fork()) == 0) {
-        char tmpfile[256];
-
-        /* Child */
-
-        // 关闭网络连接 fd
-        closeListeningSockets(0);
-
-        // 为进程设置名字，方便记认
-        redisSetProcTitle("redis-aof-rewrite");
-
-        // 创建临时文件，并进行 AOF 重写
-        snprintf(tmpfile,256,"temp-rewriteaof-bg-%d.aof", (int) getpid());
-        if (rewriteAppendOnlyFile(tmpfile) == REDIS_OK) {
-            size_t private_dirty = zmalloc_get_private_dirty();
-
-            if (private_dirty) {
-                redisLog(REDIS_NOTICE,
-                    "AOF rewrite: %zu MB of memory used by copy-on-write",
-                    private_dirty/(1024*1024));
-            }
-            // 发送重写成功信号
-            exitFromChild(0);
-        } else {
-            // 发送重写失败信号
-            exitFromChild(1);
-        }
-    } else {
-        /* Parent */
-        // 记录执行 fork 所消耗的时间
-        server.stat_fork_time = ustime()-start;
-
-        if (childpid == -1) {
-            redisLog(REDIS_WARNING,
-                "Can't rewrite append only file in background: fork: %s",
-                strerror(errno));
-            return REDIS_ERR;
-        }
-
-        redisLog(REDIS_NOTICE,
-            "Background append only file rewriting started by pid %d",childpid);
-
-        // 记录 AOF 重写的信息
-        server.aof_rewrite_scheduled = 0;
-        server.aof_rewrite_time_start = time(NULL);
-        server.aof_child_pid = childpid;
-
-        // 关闭字典自动 rehash
-        updateDictResizePolicy();
-
-        /* We set appendseldb to -1 in order to force the next call to the
-         * feedAppendOnlyFile() to issue a SELECT command, so the differences
-         * accumulated by the parent into server.aof_rewrite_buf will start
-         * with a SELECT statement and it will be safe to merge. 
-         *
-         * 将 aof_selected_db 设为 -1 ，
-         * 强制让 feedAppendOnlyFile() 下次执行时引发一个 SELECT 命令，
-         * 从而确保之后新添加的命令会设置到正确的数据库中
-         */
-        server.aof_selected_db = -1;
-        replicationScriptCacheFlush();
-        return REDIS_OK;
-    }
-    return REDIS_OK; /* unreached */
-}
-```
 rewriteAppendOnlyFile函数的实现：
 ```
 /* Write a sequence of commands able to fully rebuild the dataset into
@@ -1616,7 +1509,121 @@ werr:
 }
 ```
 
+###AOF后台重写
 
+rewriteAppendOnlyFileBackground函数的实现：
+```
+/* This is how rewriting of the append only file in background works:
+ * 
+ * 以下是后台重写 AOF 文件（BGREWRITEAOF）的工作步骤：
+ *
+ * 1) The user calls BGREWRITEAOF
+ *    用户调用 BGREWRITEAOF
+ *
+ * 2) Redis calls this function, that forks():
+ *    Redis 调用这个函数，它执行 fork() ：
+ *
+ *    2a) the child rewrite the append only file in a temp file.
+ *        子进程在临时文件中对 AOF 文件进行重写
+ *
+ *    2b) the parent accumulates differences in server.aof_rewrite_buf.
+ *        父进程将新输入的写命令追加到 server.aof_rewrite_buf 中
+ *
+ * 3) When the child finished '2a' exists.
+ *    当步骤 2a 执行完之后，子进程结束
+ *
+ * 4) The parent will trap the exit code, if it's OK, will append the
+ *    data accumulated into server.aof_rewrite_buf into the temp file, and
+ *    finally will rename(2) the temp file in the actual file name.
+ *    The the new file is reopened as the new append only file. Profit!
+ *
+ *    父进程会捕捉子进程的退出信号，
+ *    如果子进程的退出状态是 OK 的话，
+ *    那么父进程将新输入命令的缓存追加到临时文件，
+ *    然后使用 rename(2) 对临时文件改名，用它代替旧的 AOF 文件，
+ *    至此，后台 AOF 重写完成。
+ */
+int rewriteAppendOnlyFileBackground(void) {
+    pid_t childpid;
+    long long start;
+
+    // 已经有进程在进行 AOF 重写了
+    if (server.aof_child_pid != -1) return REDIS_ERR;
+
+    // 记录 fork 开始前的时间，计算 fork 耗时用
+    start = ustime();
+
+    if ((childpid = fork()) == 0) {
+        char tmpfile[256];
+
+        /* Child */
+
+        // 关闭网络连接 fd
+        closeListeningSockets(0);
+
+        // 为进程设置名字，方便记认
+        redisSetProcTitle("redis-aof-rewrite");
+
+        // 创建临时文件，并进行 AOF 重写
+        snprintf(tmpfile,256,"temp-rewriteaof-bg-%d.aof", (int) getpid());
+        if (rewriteAppendOnlyFile(tmpfile) == REDIS_OK) {
+            size_t private_dirty = zmalloc_get_private_dirty();
+
+            if (private_dirty) {
+                redisLog(REDIS_NOTICE,
+                    "AOF rewrite: %zu MB of memory used by copy-on-write",
+                    private_dirty/(1024*1024));
+            }
+            // 发送重写成功信号
+            exitFromChild(0);
+        } else {
+            // 发送重写失败信号
+            exitFromChild(1);
+        }
+    } else {
+        /* Parent */
+        // 记录执行 fork 所消耗的时间
+        server.stat_fork_time = ustime()-start;
+
+        if (childpid == -1) {
+            redisLog(REDIS_WARNING,
+                "Can't rewrite append only file in background: fork: %s",
+                strerror(errno));
+            return REDIS_ERR;
+        }
+
+        redisLog(REDIS_NOTICE,
+            "Background append only file rewriting started by pid %d",childpid);
+
+        // 记录 AOF 重写的信息
+        server.aof_rewrite_scheduled = 0;
+        server.aof_rewrite_time_start = time(NULL);
+        server.aof_child_pid = childpid;
+
+        // 关闭字典自动 rehash
+        updateDictResizePolicy();
+
+        /* We set appendseldb to -1 in order to force the next call to the
+         * feedAppendOnlyFile() to issue a SELECT command, so the differences
+         * accumulated by the parent into server.aof_rewrite_buf will start
+         * with a SELECT statement and it will be safe to merge. 
+         *
+         * 将 aof_selected_db 设为 -1 ，
+         * 强制让 feedAppendOnlyFile() 下次执行时引发一个 SELECT 命令，
+         * 从而确保之后新添加的命令会设置到正确的数据库中
+         */
+        server.aof_selected_db = -1;
+        replicationScriptCacheFlush();
+        return REDIS_OK;
+    }
+    return REDIS_OK; /* unreached */
+}
+```
+将AOF重写程序放到子进程里执行，可以达到两个目的：
+
+- 子进程进行AOF重写期间，服务器进程（父进程）可以继续处理命令请求
+- 子进程带有服务器进程的数据副本，使用子进程而不是线程，可以在避免使用锁的情况下，保证数据的安全性
+不过，子进程在进行AOF重写期间，服务器进程还需要继续处理命令请求，而
 ##**4、事件**
 > 关键字：I/O并发模式，文件事件处理器，时间事件处理器
 
