@@ -1692,6 +1692,26 @@ Redis的I/O多路复用程序的所有功能都是通过包装常见的select、
 
 因为redis为每个I/O多路复用函数库都实现了相同的API，所以I/O多路复用程序的底层实现是可以互换的。
 
+Redis在I/O多路复用程序的实现源码中用#include宏定义了相应的规则，程序会在编译时自动选择系统中性能最高的I/O多路复用函数库作为Redis的I/O多路复用程序底层实现。
+```
+/* Include the best multiplexing layer supported by this system.
+ * The following should be ordered by performances, descending. */
+#ifdef HAVE_EVPORT
+#include "ae_evport.c"
+#else
+    #ifdef HAVE_EPOLL
+    #include "ae_epoll.c"
+    #else
+        #ifdef HAVE_KQUEUE
+        #include "ae_kqueue.c"
+        #else
+        #include "ae_select.c"
+        #endif
+    #endif
+#endif
+```
+
+
 
 
 ##**5、客户端**
