@@ -1710,6 +1710,77 @@ Redis在I/O多路复用程序的实现源码中用#include宏定义了相应的�
     #endif
 #endif
 ```
+#### 事件类型
+I/O多路复用程序可以监听多个套接字的ae.h/AE_READABLE事件和ae.h/AE_WRITABLE事件，这两类事件和套接字操作之间的对应关系如下:
+    - 当套接字变得可读时，（客户端对套接字执行write操作，或者执行close操作），或者有新的可应答（acceptable）套接字出现时，（客户端对服务器的监听套接字执行connect操作），套接字产生AE_READABLE事件。
+    - 当套接字变得可写时，（客户端对套接字执行read操作），套接字产生AE_WRITABLE事件。
+
+I/O多路复用程序允许服务器同时监听套接字的AE_READABLE事件和AE_WRITABLE事件，如果一个套接字同时产生了这两种事件，那么文件事件分派器会优先处理AE_READABLE事件，等到AE_READABLE事件处理完之后，才处理AE_WRITABLE事件。
+即，如果一个套接字既可读又可写，那么服务器将先读套接字，后写套接字。
+    - ae.c/aeCreateFileEvent函数接受一个套接字描述符、一个事件类型，以及一个事件处理器作为参数，将给定套接字的给定事件加入到I/O多路复用程序的监听范围之内，并对事件和事件处理器进行关联。
+    - ae.c/aeDeleteFileEvent函数接受一个套接字描述符和一个监听事件类型作为参数，让I/O多路复用程序取消对给定套接字的给定事件的监听，并取消事件和事件处理器之间的关联
+    - ae.c/aeGetFileEvents函数接受一个套接字描述符，返回该套接字正在被监听的事件类型：
+        + 没有任何事件被监听，函数返回AE_NONE
+        + 读事件正在被监听，函数返回AE_READABLE
+        + 写事件正在被监听，函数返回AE_WRITABLE
+        + 读和写事件正在被监听，函数返回AE_READABLE | AE_WRITABLE
+        
+### 文件事件处理器
+文件事件处理器：
+    - 服务器为监听套接字关联连接应答处理器，对连接服务器的各个客户端进行应答
+    - 服务器为客户端套接字关联命令请求处理器，接收客户端传来的命令请求
+    - 服务器为客户端套接字关联命令回复处理器，向客户端返回命令的执行结果
+    - 主从服务器都需要关联特别为复制功能编写的复制处理器，用于主服务器和从服务器的复制操作
+#### 连接应答处理器
+    networking.c/acceptTcpHandler函数是Redis的连接应答处理器，用于对连接服务器监听套接字的客户端进行应答，具体实现为sys/socket.h/accept函数的包装。
+
+    客户端使用sys/socket.h/connect函数连接服务器监听套接字的时候，套接字就会产生AE_READABLE事件，引发连接应答处理器执行。
+#### 命令请求处理器
+    networking.c/readQueryFromClient，具体实现为unistd.h/read函数的包装
+#### 命令回复处理器
+    networking.c/sendReplyToClient，具体实现为unistd.h/write函数的包装
+
+###时间事件
+Redis的时间事件
+    - 定时事件：指定时间执行一次
+    - 周期性事件：每隔指定时间执行一次
+
+时间事件主要由三个属性组成：
+    - id：全局唯一id
+    - when：毫秒精度的UNIX时间戳，记录时间事件的到达时间
+    - timeProc：时间事件处理器，一个函数。
+
+一个时间事件是定时事件还是周期性事件取决于时间事件处理器的返回值：
+    - 如果事件处理器返回ae.h/AE_NOMORE，定时事件
+    - 非AE_NOMORE，周期性事件，当一个时间事件到达后，服务器会根据事件处理器返回的值，对时间事件的when属性进行更新，让这个事件在一段时间后再次到达
+
+###API
+- ae.c/aeCreateTimeEvent
+- ae.c/aeDeleteFileEvent
+- ae.c/aeSearchNearestTimer:返回到达时间距离当前时间最接近的那个时间事件
+- ae.c/processTimeEvents:遍历所有已到达的时间事件，调用其处理器
+```
+def processTimeEvents:
+    for time_event in all_time_event():
+        if time_event.when <= unix_ts_now():
+            retval = time_event.timeProc()
+            if retval == AE_NOMORE:
+                delete_time_event_from_server(time_event)
+        else:
+            update_when(time_event, retval)
+```
+###事件的调度与执行
+```
+def aeProcessEvents():
+    time_event = aeSearchNearestTimer()
+    remaind_ms = time_event.when - unix_ts_now()
+    if remaind_ms < 0:
+        remaind_ms = 0
+    timeval = create_timeval_with_ms(remaind_ms)
+    aeApiPoll(timeval)
+    processFileEvents()
+    processTimeEvents()
+    ```
 
 
 
